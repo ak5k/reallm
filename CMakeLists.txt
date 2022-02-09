@@ -83,7 +83,7 @@ if(WIN32)
     $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
 
     # Use relative path to the PDB file to avoid exposing the full path
-    /PDBALTPATH:%_PDB%
+    # /PDBALTPATH:%_PDB%
   )
 else()
   add_compile_options(
