@@ -9,6 +9,7 @@ Registers following REAPER API functions for ReaScripting:
 ```
 Llm_Do
 Llm_Get
+Llm_Set
 ```
 Once installed, documentation available in REAPER Help > ReaScript documentation...
 
