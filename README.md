@@ -5,7 +5,7 @@ Cubase/Logic style low latency monitoring mode for REAPER. While enabled, restri
 
 Registers `ReaLlm: Low latency monitoring` REAPER action list toggle for enabling/disabling low latency monitoring.
 
-Registers following REAPER API functions for scripting:
+Registers following REAPER API functions for ReaScripting:
 ```
 Llm_Do
 Llm_Get
