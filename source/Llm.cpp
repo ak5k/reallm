@@ -94,9 +94,9 @@ void Llm::UpdateNetwork(bool setFxGuidMap, MediaTrack* tr)
             GUID* g = TrackFX_GetFXGUID(node, j);
             fxMap.emplace(pair(g, TrackFX(node, i, g, j)));
             if (setFxGuidMap) {
-                char buf[GUIDSIZE];
-                guidToString(g, buf);
-                fxGuidMap.emplace(pair(string(buf), g));
+                char bufGuid[GUIDSIZE];
+                guidToString(g, bufGuid);
+                fxGuidMap.emplace(pair(string(bufGuid), g));
             }
         }
 
@@ -205,9 +205,9 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
         while (!GetTrackStateChunk(tr, buf, CHUNKSIZE, false))
             ;
         const regex re("PDC_OPTIONS (\\d+)");
-        cmatch m;
-        regex_search(buf, m, re);
-        string s = string(m[1]);
+        cmatch match;
+        regex_search(buf, match, re);
+        string s = string(match[1]);
         if (s == "0" || s == "2") {
             pdcMode = stoi(s);
         }
@@ -216,10 +216,10 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
     const auto instrument = TrackFX_GetInstrument(tr);
 
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
-        char buf[SMALLBUFSIZE];
-        while (!TrackFX_GetNamedConfigParm(tr, i, "pdc", buf, SMALLBUFSIZE))
+        char bufPdc[SMALLBUFSIZE];
+        while (!TrackFX_GetNamedConfigParm(tr, i, "pdc", bufPdc, SMALLBUFSIZE))
             ;
-        auto pdc = stoi(buf) * 1.;
+        auto pdc = stoi(bufPdc) * 1.;
         const auto isEnabled = TrackFX_GetEnabled(tr, i);
         const auto guid = TrackFX_GetFXGUID(tr, i);
 
@@ -586,12 +586,12 @@ void Llm::Get(const char* parmname, char* buf, int bufSz, MediaTrack* tr)
             s.append(to_string(trNum));
             s.append(";");
             for (auto&& j : i.second) {
-                auto trNum =
+                auto trNumNeighbor =
                     (int)GetMediaTrackInfo_Value(j, "IP_TRACKNUMBER") - 1;
-                if (trNum < -1) {
-                    trNum = -1;
+                if (trNumNeighbor < -1) {
+                    trNumNeighbor = -1;
                 }
-                s.append(to_string(trNum));
+                s.append(to_string(trNumNeighbor));
                 s.append(";");
             }
             if (!s.empty() && s.back() == ';') {
@@ -625,13 +625,13 @@ void Llm::Get(const char* parmname, char* buf, int bufSz, MediaTrack* tr)
 
     auto n = (int)s.size();
     if (realloc_cmd_ptr(&buf, &bufSz, n)) {
-        strncpy(buf, s.c_str(), bufSz);
+        strncpy(buf, s.c_str(), (size_t)bufSz);
     }
     else {
         if (n >= bufSz) {
             n = bufSz - 1;
         }
-        strncpy(buf, s.c_str(), n);
+        strncpy(buf, s.c_str(), (size_t)n);
         buf[n + 1] = '\0';
     }
 

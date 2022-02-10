@@ -108,7 +108,7 @@ target_include_directories(
   ${CMAKE_SOURCE_DIR}/vendor/reaper-sdk/sdk)
 if(WIN32)
   target_compile_options(common INTERFACE
-    /W3 /wd4996
+    /W4 /wd4100 /wd4505 /wd4706 /wd4996
     /WX
     )
   target_compile_definitions(common INTERFACE NOMINMAX UNICODE)
@@ -150,7 +150,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 # install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION "${REAPER_USER_PLUGINS}" OPTIONAL)
 
-# if(NOT WIN32)
 # if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL)
 #     file(REMOVE
 #         ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
@@ -164,7 +163,6 @@ install(TARGETS ${PROJECT_NAME}
 #             ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
 #             SYMBOLIC)
 #     endif()
-# endif()
 # endif()
 
 if (MSVC AND CMAKE_BUILD_TYPE MATCHES RELEASE)
