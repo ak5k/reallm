@@ -1,8 +1,8 @@
 # heavily 'inspired' by cfillions reapack/reaimgui
 
-version: "{build}-{branch}"
+version: '{build}-{branch}'
 
-before_build
+before_build:
   - git submodule update --init --recursive --depth 1
 build_script:
   - cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -132,7 +132,7 @@ environment:
 deploy:
   provider: GitHub
   draft: true
-  description: ""
+  description: ''
   force_update: true
   auth_token:
     secure: Rk8do2Q/etdabjwIABBRdTJu1a4wYVu9Ltz8HJuC0wc3rz+hHUMGa3N7vTlsrd7z
