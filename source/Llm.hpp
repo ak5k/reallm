@@ -1,5 +1,5 @@
 #pragma once
-// #include "reaper_api.h"
+#include "reaper_api.h"
 #include <atomic>
 #include <mutex>
 #include <reaper_plugin_functions.h>
@@ -52,6 +52,7 @@ class Llm {
     int limit;
     int projectStateChangeCount;
     mutex m;
+
     static atomic<bool> pdcModeCheck;
     static atomic<int> state;
     static int commandId;
@@ -90,9 +91,12 @@ class Llm {
     static const char* defstring_Get;
     static void Get(
         const char* parmname,
-        MediaTrack* tr = nullptr,
         char* buf = nullptr,
-        int bufSz = 0);
+        int bufSz = 0,
+        MediaTrack* tr = nullptr);
+
+    static const char* defstring_Set;
+    static void Set(const char* parmname, const char* buf = nullptr);
 
     static void Register(bool load);
 };

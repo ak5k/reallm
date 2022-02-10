@@ -1,7 +1,7 @@
 add_library(
-	reaak5k OBJECT
+	reallm OBJECT
 	main.cpp
 	Llm.cpp
 	)
 
-target_link_libraries(reaak5k common)
+target_link_libraries(reallm common)

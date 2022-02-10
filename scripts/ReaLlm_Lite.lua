@@ -1,4 +1,6 @@
 --example of how to run ReaLlm every 30th defer cycle.
+local defer_count = 30
+
 
 if not reaper.APIExists("Llm_Do") then
   reaper.ShowMessageBox("ReaLlm not installed?", "ReaLlm Lite", 0)
@@ -11,11 +13,13 @@ local function ToggleCommandState(state)
   reaper.RefreshToolbar2(sec, cmd)
 end
 
+reaper.Llm_Set("P_PDCMODECHECK", "0")
+
 local count
-function main(exit)
+local function main(exit)
   count = count or 0
   count = count + 1
-  if count > 30 or exit then
+  if count > defer_count or exit then
     count = 0
     reaper.Llm_Do(exit)
   end
@@ -25,7 +29,7 @@ end
 ToggleCommandState(1)
 reaper.defer(main)
 
-function exit()
+local function exit()
   local exit = true
   reaper.Llm_Do(exit)
   ToggleCommandState(0)

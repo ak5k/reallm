@@ -1,3 +1,4 @@
+
 #include "Llm.hpp"
 #include <cstring>
 #include <math.h>
@@ -37,7 +38,7 @@ Llm::Llm()
 
 atomic<int> Llm::state {0};
 atomic<bool> Llm::pdcModeCheck {false};
-int Llm::commandId = -1;
+int Llm::commandId {-1};
 
 void Llm::UpdateNetwork(bool setFxGuidMap, MediaTrack* tr)
 {
@@ -89,10 +90,10 @@ void Llm::UpdateNetwork(bool setFxGuidMap, MediaTrack* tr)
             inputTracks.push_back(node);
         }
 
-        if (setFxGuidMap) {
-            for (auto j = 0; j < TrackFX_GetCount(node); j++) {
-                GUID* g = TrackFX_GetFXGUID(node, j);
-                fxMap.emplace(pair(g, TrackFX(node, i, g, j)));
+        for (auto j = 0; j < TrackFX_GetCount(node); j++) {
+            GUID* g = TrackFX_GetFXGUID(node, j);
+            fxMap.emplace(pair(g, TrackFX(node, i, g, j)));
+            if (setFxGuidMap) {
                 char buf[GUIDSIZE];
                 guidToString(g, buf);
                 fxGuidMap.emplace(pair(string(buf), g));
@@ -147,7 +148,7 @@ void Llm::GetSetState(bool isSet)
         fxSafe.clear();
 
         static auto bufSz = BUFSIZ;
-        static char* p;
+        static char* p = nullptr;
         if (!p) {
             while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
                 ;
@@ -382,7 +383,7 @@ const char* Llm::defstring_Do =
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 void Llm::Do(bool* exit)
 {
-    auto time0 = time_precise();
+    // auto time0 = time_precise();
     Llm& llm = Llm::getInstance();
     scoped_lock lock(llm.m);
 
@@ -410,8 +411,8 @@ void Llm::Do(bool* exit)
         llm.GetSetState(true);
     }
 
-    auto time1 = time_precise() - time0;
-    ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    // auto time1 = time_precise() - time0;
+    // ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
     if (exit != nullptr && *exit == true) {
         llm.network.clear();
         llm.fxGuidMap.clear();
@@ -421,8 +422,8 @@ void Llm::Do(bool* exit)
 
 Llm& Llm::getInstance()
 {
-    static Llm* llm = new Llm();
-    return *llm;
+    static Llm* instance {new Llm};
+    return *instance;
 }
 
 bool Llm::CommandHook(
@@ -466,25 +467,31 @@ int Llm::ToggleActionCallback(int command)
 }
 
 const char* Llm::defstring_Get =
-    "void\0const char*,MediaTrack*,char*,int\0"
+    "void\0const char*,char*,int,MediaTrack*\0"
     "parmname,"
-    "trInOptional,"
     "bufOutNeedBig,"
-    "bufOutNeedBig_sz\0"
-    "Get ReaLlm information string. Zero-based indices. Master track index -1."
-    "Optional MediaTrack tr gets results relative to tr."
-    "\n"
+    "bufOutNeedBig_sz,"
+    "trInOptional\0"
+    "Get ReaLlm information string. Zero-based indices. Master track index -1. "
+    "Optional MediaTrack* tr gets results relative to tr. "
+    "Each line (newline '\\n' separated) represents entry. "
+    "Tracks are separated with ';'. "
+    "FX are listed after ':' separated with ','. "
+    "\n" //
     "P_GRAPH: "
-    "Mixer routings as graph of network nodes in format "
+    "Mixer routings as network graph in format "
     "\"node;neighborhood\\n\" "
     "where node is track, and neighborhood is group of tracks in format "
     "\"track;tr#1;tr#2...\\n\". "
     "Or as \"parent;children\\n\" where first field is parent and rest are "
-    "children."
-    "Or as multiply linked list where first field is node and rest are links."
+    "children. "
+    "Or as multiply linked list where first field is node and rest are links. "
     "E.g. \"7;1;-1;\\n\" would mean "
     "\"8th track is connected to 2nd track and Master track.\""
-    "\n"
+    "\n" //
+    "P_PDCMODECHECK: "
+    "Is PDC mode check enabled? \"0\" or \"1\"."
+    "\n" //
     "P_REALLM: "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
@@ -492,11 +499,14 @@ const char* Llm::defstring_Get =
     "E.g. \"3:1,2;0;-1:0\\n\" would be: "
     "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
     "Master track, fx#1 disabled."
-    "\n"
+    "\n" //
+    "P_SAFE: "
+    "'Safed' plugins as \"track#:fx#\\n\" pairs."
+    "\n" //
     "P_VECTOR: "
-    "As ReaLlm but without FX information. Faster.";
+    "As ReaLlm without FX information. Faster.";
 
-void Llm::Get(const char* parmname, MediaTrack* tr, char* buf, int bufSz)
+void Llm::Get(const char* parmname, char* buf, int bufSz, MediaTrack* tr)
 {
     Llm& llm = Llm::getInstance();
     scoped_lock lock(llm.m);
@@ -593,6 +603,26 @@ void Llm::Get(const char* parmname, MediaTrack* tr, char* buf, int bufSz)
         }
     }
 
+    if (strcmp(parmname, "P_SAFE") == 0) {
+        llm.UpdateNetwork(true);
+        llm.GetSetState();
+        for (auto i = llm.fxSafe.begin(); i != llm.fxSafe.end();) {
+            auto v = llm.fxMap.find(*i);
+            if (v == llm.fxMap.end()) {
+                i = llm.fxSafe.erase(i);
+            }
+            else {
+                ++i;
+            }
+        }
+        for (auto&& i : llm.fxSafe) {
+            s.append(to_string(llm.fxMap.at(i).trIdx));
+            s.append(":");
+            s.append(to_string(llm.fxMap.at(i).fxIdx));
+            s.append("\n");
+        }
+    }
+
     auto n = (int)s.size();
     if (realloc_cmd_ptr(&buf, &bufSz, n)) {
         strncpy(buf, s.c_str(), bufSz);
@@ -603,6 +633,32 @@ void Llm::Get(const char* parmname, MediaTrack* tr, char* buf, int bufSz)
         }
         strncpy(buf, s.c_str(), n);
         buf[n + 1] = '\0';
+    }
+
+    return;
+}
+
+const char* Llm::defstring_Set =
+    "void\0const char*,const char*\0"
+    "parmname,"
+    "bufIn\0"
+    "Set ReaLlm parameters."
+    "\n" //
+    "P_PDCMODECHECK: "
+    "\"0\" or \"1\".";
+
+void Llm::Set(const char* parmname, const char* buf)
+{
+    Llm& llm = Llm::getInstance();
+    scoped_lock lock(llm.m);
+
+    if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
+        if (stoi(buf) == 0) {
+            llm.pdcModeCheck.store(false);
+        }
+        else if (stoi(buf) == 1) {
+            llm.pdcModeCheck.store(true);
+        }
     }
 
     return;
@@ -621,32 +677,42 @@ void Llm::Register(bool load)
         plugin_register("-hookcommand2", (void*)&CommandHook);
         plugin_register("-toggleaction", (void*)&ToggleActionCallback);
 
-        plugin_register("-API_Llm_Get", (void*)&Get);
-        plugin_register("-APIdef_Llm_Get", (void*)defstring_Get);
-        plugin_register(
-            "-APIvararg_Llm_Get",
-            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
         plugin_register("-API_Llm_Do", (void*)&Do);
         plugin_register("-APIdef_Llm_Do", (void*)defstring_Do);
         plugin_register(
             "-APIvararg_Llm_Do",
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
+        plugin_register("-API_Llm_Get", (void*)&Get);
+        plugin_register("-APIdef_Llm_Get", (void*)defstring_Get);
+        plugin_register(
+            "-APIvararg_Llm_Get",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
+        plugin_register("-API_Llm_Set", (void*)&Set);
+        plugin_register("-APIdef_Llm_Set", (void*)defstring_Set);
+        plugin_register(
+            "-APIvararg_Llm_Set",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
     }
     else {
         commandId = plugin_register("custom_action", &action);
         plugin_register("hookcommand2", (void*)&CommandHook);
         plugin_register("toggleaction", (void*)&ToggleActionCallback);
 
-        plugin_register("API_Llm_Get", (void*)&Get);
-        plugin_register("APIdef_Llm_Get", (void*)defstring_Get);
-        plugin_register(
-            "APIvararg_Llm_Get",
-            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
         plugin_register("API_Llm_Do", (void*)&Do);
         plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
         plugin_register(
             "APIvararg_Llm_Do",
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
+        plugin_register("API_Llm_Get", (void*)&Get);
+        plugin_register("APIdef_Llm_Get", (void*)defstring_Get);
+        plugin_register(
+            "APIvararg_Llm_Get",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
+        plugin_register("API_Llm_Set", (void*)&Set);
+        plugin_register("APIdef_Llm_Set", (void*)defstring_Set);
+        plugin_register(
+            "APIvararg_Llm_Set",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
     }
     return;
 }

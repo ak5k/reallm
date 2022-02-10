@@ -104,7 +104,7 @@ add_library(common INTERFACE)
 target_include_directories(
   common SYSTEM INTERFACE
   ${CMAKE_SOURCE_DIR}/include
-  ${CMAKE_SOURCE_DIR}/vendor 
+  # ${CMAKE_SOURCE_DIR}/vendor 
   ${CMAKE_SOURCE_DIR}/vendor/reaper-sdk/sdk)
 if(WIN32)
   target_compile_options(common INTERFACE
@@ -150,22 +150,22 @@ install(TARGETS ${PROJECT_NAME}
 )
 # install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION "${REAPER_USER_PLUGINS}" OPTIONAL)
 
-if(NOT WIN32)
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL)
-    file(REMOVE
-        ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
-    )
-    find_package(Git QUIET)
-    execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-    if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
-        file(CREATE_LINK
-            ${PROJECT_SOURCE_DIR}/vendor/WDL/WDL
-            ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
-            SYMBOLIC)
-    endif()
-endif()
-endif()
+# if(NOT WIN32)
+# if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL)
+#     file(REMOVE
+#         ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
+#     )
+#     find_package(Git QUIET)
+#     execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1
+#         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+#     if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
+#         file(CREATE_LINK
+#             ${PROJECT_SOURCE_DIR}/vendor/WDL/WDL
+#             ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
+#             SYMBOLIC)
+#     endif()
+# endif()
+# endif()
 
 if (MSVC AND CMAKE_BUILD_TYPE MATCHES RELEASE)
     set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )
@@ -177,12 +177,12 @@ if (MSVC AND CMAKE_BUILD_TYPE MATCHES RELEASE)
 endif ()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/source)
-target_link_libraries(${PROJECT_NAME} reaak5k)
+target_link_libraries(${PROJECT_NAME} reallm)
 
 find_package(WDL REQUIRED)
-target_link_libraries(reaak5k WDL::WDL)
+target_link_libraries(reallm WDL::WDL)
 
 if(NOT WIN32)
   find_package(SWELL REQUIRED)
-  target_link_libraries(reaak5k SWELL::swell)
+  target_link_libraries(reallm SWELL::swell)
 endif()
