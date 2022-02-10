@@ -12,6 +12,6 @@ Llm_Get
 ```
 Once installed, documentation available in REAPER Help > ReaScript documentation...
 
-More information here
+[More information](https://forum.cockos.com/showthread.php?t=245445)
 
 ![image](https://i.imgur.com/iKHyQXb.gif)
