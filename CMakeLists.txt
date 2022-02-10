@@ -17,7 +17,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   endif()
 
   set(CMAKE_INSTALL_PREFIX "${USER_CONFIG_DIR}/REAPER" CACHE PATH
-    "REAPER resource path where to install ReaAk5k" FORCE)
+    "REAPER resource path where to install ReaLlm" FORCE)
 endif()
 
 
@@ -139,7 +139,7 @@ add_library(${PROJECT_NAME} SHARED)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
   PREFIX "" # disable the "lib" prefix
-  OUTPUT_NAME "reaper_reaak5k-${ARCH_NAME}"
+  OUTPUT_NAME "reaper_reallm-${ARCH_NAME}"
 )
 set(REAPER_USER_PLUGINS "UserPlugins")
 

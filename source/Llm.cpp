@@ -39,7 +39,7 @@ atomic<int> Llm::state {0};
 atomic<bool> Llm::pdcModeCheck {false};
 int Llm::commandId = -1;
 
-void Llm::UpdateNetwork(bool setFxGuidMap)
+void Llm::UpdateNetwork(bool setFxGuidMap, MediaTrack* tr)
 {
     inputTracks.clear();
     for (auto&& i : network) {
@@ -63,6 +63,9 @@ void Llm::UpdateNetwork(bool setFxGuidMap)
         auto node = GetTrack(0, i);
         if (!node) {
             node = masterTrack;
+        }
+        if (ValidatePtr(tr, "MediaTrack*") && tr != node) {
+            continue;
         }
         if (network.find(node) == network.end()) {
             network[node] = TrackVector {};
@@ -98,8 +101,7 @@ void Llm::UpdateNetwork(bool setFxGuidMap)
 
         neighbor = node;
         for (auto j = 0; j < GetTrackNumSends(node, -1); j++) {
-            auto mute =
-                (bool)GetTrackSendInfo_Value(neighbor, -1, j, "B_MAINSEND");
+            auto mute = (bool)GetTrackSendInfo_Value(neighbor, -1, j, "B_MUTE");
             node = (MediaTrack*)(uintptr_t)
                 GetTrackSendInfo_Value(neighbor, -1, j, "P_SRCTRACK");
             if (!mute) {
@@ -371,10 +373,14 @@ bool Llm::ProcessTrackFXs()
 }
 
 const char* Llm::defstring_Do =
-    "void\0bool*\0exitOptional\0"
-    "Executes one ReaLlm cycle.\n"
-    "Optional boolean exitIn parameter true performs 'shutdown'.\n";
-void Llm::Do(bool* exitInOptional)
+    "void\0bool*\0exitInOptional\0"
+    "Executes one ReaLlm cycle. "
+    "E.g. for running ReaLlm on custom timer, or deferred."
+    "Or as 'one shot'. "
+    "Optional boolean true performs 'shutdown'. "
+    "In fact, this is what toggling ReaLlm action on/off does; "
+    "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
+void Llm::Do(bool* exit)
 {
     auto time0 = time_precise();
     Llm& llm = Llm::getInstance();
@@ -395,8 +401,7 @@ void Llm::Do(bool* exitInOptional)
     }
     // }
 
-    if (llm.bsize == 0 ||
-        (exitInOptional != nullptr && *exitInOptional == true)) {
+    if (llm.bsize == 0 || (exit != nullptr && *exit == true)) {
         llm.fxToDisable.clear();
     }
 
@@ -407,6 +412,10 @@ void Llm::Do(bool* exitInOptional)
 
     auto time1 = time_precise() - time0;
     ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    if (exit != nullptr && *exit == true) {
+        llm.network.clear();
+        llm.fxGuidMap.clear();
+    }
     return;
 }
 
@@ -457,45 +466,59 @@ int Llm::ToggleActionCallback(int command)
 }
 
 const char* Llm::defstring_Get =
-    "void\0const "
-    "char*,char*,int,MediaTrack*\0parmname,strOutNeedBig,strOutNeedBig_sz,"
-    "trInOptional\0"
-    "Get ReaLlm information. Zero-based indices. Master track index -1."
+    "void\0const char*,MediaTrack*,char*,int\0"
+    "parmname,"
+    "trInOptional,"
+    "bufOutNeedBig,"
+    "bufOutNeedBig_sz\0"
+    "Get ReaLlm information string. Zero-based indices. Master track index -1."
+    "Optional MediaTrack tr gets results relative to tr."
     "\n"
     "P_GRAPH: "
-    "Current mixer configuration as graph of network nodes in format "
-    "\"node:neighborhood\\n\" "
+    "Mixer routings as graph of network nodes in format "
+    "\"node;neighborhood\\n\" "
     "where node is track, and neighborhood is group of tracks in format "
-    "\"tr#1;tr#2;...;\". "
-    "Or as \"parent:children\\n\". "
-    "E.g. \"2:1;-1;\\n\" would mean "
-    "\"3rd track is connected to 2nd track and Master track.\""
+    "\"track;tr#1;tr#2...\\n\". "
+    "Or as \"parent;children\\n\" where first field is parent and rest are "
+    "children."
+    "Or as multiply linked list where first field is node and rest are links."
+    "E.g. \"7;1;-1;\\n\" would mean "
+    "\"8th track is connected to 2nd track and Master track.\""
     "\n"
-    "P_STATE: "
-    "Current state of ReaLlm as string of approach vektors in format: "
-    "\"begin track:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
+    "P_REALLM: "
+    "Current state of ReaLlm as approach vektors with disabled FX in "
+    "format: "
+    "\"begin:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
     "E.g. \"3:1,2;0;-1:0\\n\" would be: "
     "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
     "Master track, fx#1 disabled."
-    "\n";
+    "\n"
+    "P_VECTOR: "
+    "As ReaLlm but without FX information. Faster.";
 
-void Llm::Get(
-    const char* parmname,
-    char* strOutNeedBig,
-    int strOutNeedBig_sz,
-    MediaTrack* trInOptional)
+void Llm::Get(const char* parmname, MediaTrack* tr, char* buf, int bufSz)
 {
     Llm& llm = Llm::getInstance();
     scoped_lock lock(llm.m);
 
-    static string res;
-    res.clear();
+    static string s;
+    s.clear();
 
-    if (strcmp(parmname, "P_STATE") == 0) {
-        llm.UpdateNetwork();
-        llm.GetSetState();
+    if (strcmp(parmname, "P_REALLM") == 0 ||
+        strcmp(parmname, "P_VECTOR") == 0) {
+        if (strcmp(parmname, "P_VECTOR")) {
+            llm.UpdateNetwork(false, tr);
+        }
+        else {
+            llm.UpdateNetwork(true, tr);
+            llm.GetSetState();
+        }
         auto pdcTemp = llm.pdcModeCheck.load();
         llm.pdcModeCheck = false;
+        if (ValidatePtr(tr, "MediaTrack*")) {
+            llm.inputTracks.clear();
+            llm.inputTracks.push_back(tr);
+        }
         for (auto&& i : llm.inputTracks) {
             llm.TraverseNetwork(i,
                                 false); // ignore plugin latency checks
@@ -508,61 +531,79 @@ void Llm::Get(
                 if (trNum < -1) {
                     trNum = -1;
                 }
-                res.append(to_string(trNum));
-                for (auto k = 0; k < TrackFX_GetCount(j); k++) {
-                    if (k == 0) {
-                        res.append(":");
-                    }
-                    auto g = TrackFX_GetFXGUID(j, k);
-                    auto v =
-                        find(llm.fxDisabled.begin(), llm.fxDisabled.end(), g);
-                    if (v != llm.fxDisabled.end()) {
-                        res.append(to_string(k));
-                        res.append(",");
+                s.append(to_string(trNum));
+                if (strcmp(parmname, "P_STATE") == 0) {
+                    for (auto k = 0; k < TrackFX_GetCount(j); k++) {
+                        if (k == 0) {
+                            s.append(":");
+                        }
+                        auto g = TrackFX_GetFXGUID(j, k);
+                        auto v = find(
+                            llm.fxDisabled.begin(),
+                            llm.fxDisabled.end(),
+                            g);
+                        if (v != llm.fxDisabled.end()) {
+                            s.append(to_string(k));
+                            s.append(",");
+                        }
                     }
                 }
-                if (res.back() == ',') {
-                    res.pop_back();
+                if (!s.empty() && s.back() == ',') {
+                    s.pop_back();
                 }
-                res.append(";");
+                s.append(";");
             }
-            if (res.back() == ';') {
-                res.pop_back();
+            if (!s.empty() && s.back() == ';') {
+                s.pop_back();
             }
-            res.append("\n");
+            if (!s.empty()) {
+                s.append("\n");
+            };
         }
     }
 
     if (strcmp(parmname, "P_GRAPH") == 0) {
-        llm.UpdateNetwork(false);
+        llm.UpdateNetwork(false, tr);
         for (auto&& i : llm.network) {
+            if (i.second.empty()) {
+                continue;
+            }
             auto trNum =
                 (int)GetMediaTrackInfo_Value(i.first, "IP_TRACKNUMBER") - 1;
             if (trNum < -1) {
                 trNum = -1;
             }
-            res.append(to_string(trNum));
+            s.append(to_string(trNum));
+            s.append(";");
             for (auto&& j : i.second) {
-                if (j == *i.second.begin()) {
-                    res.append(":");
-                }
                 auto trNum =
                     (int)GetMediaTrackInfo_Value(j, "IP_TRACKNUMBER") - 1;
                 if (trNum < -1) {
                     trNum = -1;
                 }
-                res.append(to_string(trNum));
-                res.append(";");
+                s.append(to_string(trNum));
+                s.append(";");
             }
-            if (res.back() == ';') {
-                res.pop_back();
+            if (!s.empty() && s.back() == ';') {
+                s.pop_back();
             }
-            res.append("\n");
+            if (!s.empty()) {
+                s.append("\n");
+            };
         }
     }
 
-    realloc_cmd_ptr(&strOutNeedBig, &strOutNeedBig_sz, (int)res.size());
-    strncpy(strOutNeedBig, res.c_str(), strOutNeedBig_sz);
+    auto n = (int)s.size();
+    if (realloc_cmd_ptr(&buf, &bufSz, n)) {
+        strncpy(buf, s.c_str(), bufSz);
+    }
+    else {
+        if (n >= bufSz) {
+            n = bufSz - 1;
+        }
+        strncpy(buf, s.c_str(), n);
+        buf[n + 1] = '\0';
+    }
 
     return;
 }

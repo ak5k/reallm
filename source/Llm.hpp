@@ -1,5 +1,5 @@
 #pragma once
-#include "reaper_api.h"
+// #include "reaper_api.h"
 #include <atomic>
 #include <mutex>
 #include <reaper_plugin_functions.h>
@@ -64,7 +64,7 @@ class Llm {
         const bool checkLatency = true,
         double pdcCurrent = 0);
 
-    void UpdateNetwork(bool setFxGuidMap = true);
+    void UpdateNetwork(bool setFxGuidMap = true, MediaTrack* tr = nullptr);
 
   public:
     // singleton
@@ -81,17 +81,18 @@ class Llm {
         const int valhw,
         const int relmode,
         HWND hwnd);
+
     static int ToggleActionCallback(int command);
+
+    static const char* defstring_Do;
+    static void Do(bool* exit = nullptr);
 
     static const char* defstring_Get;
     static void Get(
         const char* parmname,
-        char* strOutNeedBig,
-        int strOutNeedBig_sz,
-        MediaTrack* trInOptional = nullptr);
-
-    static const char* defstring_Do;
-    static void Do(bool* exitInOptional = nullptr);
+        MediaTrack* tr = nullptr,
+        char* buf = nullptr,
+        int bufSz = 0);
 
     static void Register(bool load);
 };
