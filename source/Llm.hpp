@@ -1,5 +1,6 @@
 #pragma once
 // #include "reaper_api.h"
+#include <atomic>
 #include <chrono>
 #include <mutex>
 #include <reaper_plugin_functions.h>

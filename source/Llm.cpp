@@ -16,8 +16,8 @@ using namespace std;
 namespace llm {
 
 Llm::Llm()
-    : now {chrono::steady_clock::now()}
-    , pdcModeCheck {true}
+    : pdcModeCheck {true}
+    , now {chrono::steady_clock::now()}
     , fxGuidMap {}
     , fxMap {}
     , fxDisabled {}
