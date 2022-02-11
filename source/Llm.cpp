@@ -400,10 +400,11 @@ bool Llm::ProcessTrackFXs()
 const char* Llm::defstring_Do =
     "void\0bool*\0exitInOptional\0"
     "Executes one ReaLlm cycle. "
-    "E.g. for running ReaLlm on custom timer, or deferred."
+    "E.g. for running ReaLlm on custom timer, or deferred. "
     "Or as 'one shot'. "
     "Optional boolean true performs 'shutdown'. "
-    "In fact, this is what toggling ReaLlm action on/off does; "
+    "In fact, this is what toggling ReaLlm: REAPER Low latency monitoring "
+    "action on/off does; "
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 void Llm::Do(bool* exit)
 {
@@ -506,10 +507,10 @@ const char* Llm::defstring_Get =
     "\"8th track is connected to 2nd track and Master track.\""
     "\n" //
     "P_PDCLATENCY: "
-    "PDC latency in samples."
+    "Latency in samples."
     "\n" //
     "P_PDCLIMIT: "
-    "PDC latency limit in samples."
+    "Limit in samples."
     "\n" //
     "P_PDCMODECHECK: "
     "Is PDC mode check enabled? \"0\" or \"1\"."
@@ -525,8 +526,7 @@ const char* Llm::defstring_Get =
     "P_SAFE: "
     "'Safed' plugins as \"track#:fx#\\n\" pairs."
     "\n" //
-    "P_VECTOR: "
-    "As ReaLlm without FX information. Faster.";
+    "P_VECTOR: Same as P_REALLM without FX information. Faster.";
 
 void Llm::Get(const char* parmname, char* buf, int bufSz, MediaTrack* tr)
 {
@@ -676,11 +676,11 @@ const char* Llm::defstring_Set =
     "Set ReaLlm parameters."
     "\n" //
     "P_PDCLIMIT: "
-    "PDC latency limit in samples. Should be multiple of audio block/buffer "
+    "Latency limit in samples. Should be multiple of audio block/buffer "
     "size, in most cases."
     "\n" //
     "P_PDCMODECHECK: "
-    "Check Track FX Chain PDC mode. \"0\" or \"1\".";
+    "Check Track FX Chain PDC mode during Llm_Do(). \"0\" or \"1\".";
 
 void Llm::Set(const char* parmname, const char* buf)
 {
