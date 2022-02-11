@@ -1,5 +1,5 @@
 #pragma once
-#include "reaper_api.h"
+// #include "reaper_api.h"
 #include <atomic>
 #include <mutex>
 #include <reaper_plugin_functions.h>
@@ -34,7 +34,9 @@ class Llm {
 
   private:
     Llm(); // singleton
+    static Llm* instance;
 
+    bool pdcModeCheck;
     FXGUIDMap fxGuidMap;
     FXMap fxMap;
     GUIDVector fxDisabled;
@@ -49,13 +51,12 @@ class Llm {
     double reaperVersion;
     int bsize;
     int globalAutomationOverride;
-    int limit;
+    int pdcLimit;
     int projectStateChangeCount;
     mutex m;
 
-    static atomic<bool> pdcModeCheck;
-    static atomic<int> state;
     static int commandId;
+    static int state;
 
     bool ProcessTrackFXs();
     double GetLatency(MediaTrack* tr, double& pdcCurrent);
@@ -65,7 +66,7 @@ class Llm {
         const bool checkLatency = true,
         double pdcCurrent = 0);
 
-    void UpdateNetwork(bool setFxGuidMap = true, MediaTrack* tr = nullptr);
+    void UpdateNetwork(MediaTrack* tr = nullptr);
 
   public:
     // singleton
@@ -73,7 +74,7 @@ class Llm {
     Llm(Llm&&) = delete;
     Llm& operator=(Llm const&) = delete;
     Llm& operator=(Llm&&) = delete;
-    static Llm& getInstance();
+    static Llm& GetInstance();
 
     static bool CommandHook(
         KbdSectionInfo* sec,

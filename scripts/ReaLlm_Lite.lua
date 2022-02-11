@@ -21,7 +21,10 @@ local function main(exit)
   count = count + 1
   if count > defer_count or exit then
     count = 0
+    local time0 = reaper.time_precise()
     reaper.Llm_Do(exit)
+    local time1 = reaper.time_precise()
+    reaper.ShowConsoleMsg(time1-time0.."\n")
   end
   reaper.defer(main)
 end
