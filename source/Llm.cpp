@@ -154,7 +154,7 @@ void Llm::GetSetState(bool isSet)
         string k;
         stringstream ss;
 
-        auto bufSz = BUFSIZNEEDBIG;
+        size_t bufSz = BUFSIZNEEDBIG;
         char* p = nullptr;
         if (!p) {
             while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
@@ -680,7 +680,7 @@ const char* Llm::defstring_Set =
     "size, in most cases."
     "\n" //
     "P_PDCMODECHECK: "
-    "\"0\" or \"1\".";
+    "Check Track FX Chain PDC mode. \"0\" or \"1\".";
 
 void Llm::Set(const char* parmname, const char* buf)
 {
