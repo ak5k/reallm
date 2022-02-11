@@ -52,7 +52,7 @@ class Llm {
     int bsize;
     int globalAutomationOverride;
     int pdcLimit;
-    [[maybe_unused]] int projectStateChangeCount;
+    // int projectStateChangeCount;
     mutex m;
 
     static int commandId;

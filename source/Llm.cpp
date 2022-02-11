@@ -33,7 +33,7 @@ Llm::Llm()
     , bsize {0}
     , globalAutomationOverride {}
     , pdcLimit {0}
-    , projectStateChangeCount {}
+// , projectStateChangeCount {}
 {
 }
 
