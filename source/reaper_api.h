@@ -26,12 +26,14 @@
 #define REAPERAPI_WANT_TrackFX_GetCount
 #define REAPERAPI_WANT_TrackFX_GetEnabled
 #define REAPERAPI_WANT_TrackFX_GetFXGUID
+#define REAPERAPI_WANT_TrackFX_GetFXName
 #define REAPERAPI_WANT_TrackFX_GetInstrument
 #define REAPERAPI_WANT_TrackFX_GetNamedConfigParm
 #define REAPERAPI_WANT_TrackFX_SetEnabled
 #define REAPERAPI_WANT_Undo_BeginBlock
 #define REAPERAPI_WANT_Undo_EndBlock
 #define REAPERAPI_WANT_ValidatePtr
+#define REAPERAPI_WANT_ValidatePtr2
 #define REAPERAPI_WANT_guidToString
 #define REAPERAPI_WANT_plugin_register
 #define REAPERAPI_WANT_time_precise

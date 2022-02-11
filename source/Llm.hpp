@@ -1,9 +1,10 @@
 #pragma once
 // #include "reaper_api.h"
-#include <atomic>
+#include <chrono>
 #include <mutex>
 #include <reaper_plugin_functions.h>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -16,6 +17,8 @@ class Llm {
     typedef vector<MediaTrack*> TrackVector;
     typedef vector<TrackVector> Routes;
     typedef unordered_map<MediaTrack*, TrackVector> Network;
+    typedef unordered_map<MediaTrack*, unordered_map<int, double>> PdcMap;
+    typedef unordered_map<MediaTrack*, int> PdcModeMap;
     struct TrackFX {
         MediaTrack* tr;
         int trIdx;
@@ -34,9 +37,10 @@ class Llm {
 
   private:
     Llm(); // singleton
-    static Llm* instance;
+    static Llm instance;
 
     bool pdcModeCheck;
+    chrono::steady_clock::time_point now;
     FXGUIDMap fxGuidMap;
     FXMap fxMap;
     GUIDVector fxDisabled;
@@ -44,6 +48,8 @@ class Llm {
     GUIDVector fxToDisable;
     MediaTrack* masterTrack;
     Network network;
+    PdcMap pdcMap;
+    PdcModeMap pdcModeMap;
     Routes routes;
     TrackVector inputTracks;
     TrackVector stack;
@@ -56,7 +62,7 @@ class Llm {
     mutex m;
 
     static int commandId;
-    static int state;
+    static atomic<int> state;
 
     bool ProcessTrackFXs();
     double GetLatency(MediaTrack* tr, double& pdcCurrent);
@@ -67,6 +73,8 @@ class Llm {
         double pdcCurrent = 0);
 
     void UpdateNetwork(MediaTrack* tr = nullptr);
+
+    static void Daemon();
 
   public:
     // singleton

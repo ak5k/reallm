@@ -4,6 +4,15 @@ project(reaper_reallm LANGUAGES CXX)
 include(CheckCompilerFlag)
 include(CheckIncludeFileCXX)
 include(CheckLinkerFlag)
+include(FindGit)
+include(FindThreads)
+
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1 
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      )
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -104,7 +113,6 @@ add_library(common INTERFACE)
 target_include_directories(
   common SYSTEM INTERFACE
   ${CMAKE_SOURCE_DIR}/include
-  # ${CMAKE_SOURCE_DIR}/vendor 
   ${CMAKE_SOURCE_DIR}/vendor/reaper-sdk/sdk)
 if(WIN32)
   target_compile_options(common INTERFACE
@@ -150,21 +158,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 # install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION "${REAPER_USER_PLUGINS}" OPTIONAL)
 
-# if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL)
-#     file(REMOVE
-#         ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
-#     )
-#     find_package(Git QUIET)
-#     execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1
-#         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-#     if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
-#         file(CREATE_LINK
-#             ${PROJECT_SOURCE_DIR}/vendor/WDL/WDL
-#             ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/WDL
-#             SYMBOLIC)
-#     endif()
-# endif()
-
 if (MSVC AND CMAKE_BUILD_TYPE MATCHES RELEASE)
     # set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )
     set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR} )
@@ -175,7 +168,7 @@ if (MSVC AND CMAKE_BUILD_TYPE MATCHES RELEASE)
 endif ()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/source)
-target_link_libraries(${PROJECT_NAME} reallm)
+target_link_libraries(${PROJECT_NAME} reallm Threads::Threads)
 
 find_package(WDL REQUIRED)
 target_link_libraries(reallm WDL::WDL)
