@@ -1,22 +1,22 @@
 #include "Llm.hpp"
+#include <cmath>
 #include <cstring>
-#include <math.h>
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
 #include <sstream>
 
-#define BUFSIZCHUNK 1024
-#define BUFSIZGUID 64
-#define BUFSIZNEEDBIG 32768
-#define BUFSIZSMALL 8
+#define BUFSZCHUNK 1024
+#define BUFSZGUID 64
+#define BUFSZNEEDBIG 32768
+#define BUFSZSMALL 8
 
 using namespace std;
 
 namespace llm {
 
 Llm::Llm()
-    : pdcModeCheck {true}
+    : pdcModeCheck {false}
     , now {chrono::steady_clock::now()}
     , fxGuidMap {}
     , fxMap {}
@@ -24,9 +24,8 @@ Llm::Llm()
     , fxSafe {}
     , fxToDisable {}
     , masterTrack {}
-    , network {}
-    , pdcMap {}
-    , pdcModeMap {}
+    , network {} // , pdcMap {}
+                 // , pdcModeMap {}
     , routes {}
     , inputTracks {}
     , stack {}
@@ -35,14 +34,15 @@ Llm::Llm()
     , bsize {0}
     , globalAutomationOverride {}
     , pdcLimit {0}
-// , projectStateChangeCount {}
+    , projectStateChangeCount {0}
 {
 }
 
-Llm Llm::instance {};
+Llm* Llm::instance {new Llm()};
 int Llm::commandId {-1};
 atomic<int> Llm::state {0};
 
+// 'gets' current routings as network
 void Llm::UpdateNetwork(MediaTrack* tr)
 {
     inputTracks.clear();
@@ -57,8 +57,8 @@ void Llm::UpdateNetwork(MediaTrack* tr)
     masterTrack = GetMasterTrack(0);
 
     reaperVersion = stod(GetAppVersion());
-    char buf[BUFSIZSMALL];
-    if (GetAudioDeviceInfo("BSIZE", buf, BUFSIZSMALL)) {
+    char buf[BUFSZSMALL];
+    if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
         if (stoi(buf) != bsize) {
             bsize = stoi(buf);
             pdcLimit = bsize;
@@ -97,7 +97,7 @@ void Llm::UpdateNetwork(MediaTrack* tr)
         for (auto j = 0; j < TrackFX_GetCount(node); j++) {
             GUID* g = TrackFX_GetFXGUID(node, j);
             if (fxMap.find(g) == fxMap.end()) {
-                char bufGuid[BUFSIZGUID];
+                char bufGuid[BUFSZGUID];
                 guidToString(g, bufGuid);
                 fxGuidMap.emplace(pair(string(bufGuid), g));
             }
@@ -121,6 +121,7 @@ void Llm::UpdateNetwork(MediaTrack* tr)
     return;
 }
 
+// get/set reallm info to project
 void Llm::GetSetState(bool isSet)
 {
     constexpr char extName[] = "ak5k";
@@ -130,7 +131,7 @@ void Llm::GetSetState(bool isSet)
     fxToDisable.clear();
 
     if (isSet) {
-        char buf[BUFSIZGUID];
+        char buf[BUFSZGUID];
         static string s;
 
         s.clear();
@@ -156,7 +157,7 @@ void Llm::GetSetState(bool isSet)
         string k;
         stringstream ss;
 
-        size_t bufSz = BUFSIZNEEDBIG;
+        size_t bufSz = BUFSZNEEDBIG;
         char* p = nullptr;
         if (!p) {
             while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
@@ -201,40 +202,58 @@ void Llm::GetSetState(bool isSet)
     return;
 }
 
-double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
+// get track fx chain latency
+int Llm::GetLatency(MediaTrack* tr, int& pdcCurrent)
 {
     auto pdcMode {-1};
-    auto pdcTemp {0.};
+    auto pdcTemp {0};
 
     if (reaperVersion < 6.20) {
         pdcMode = 0;
     }
 
-    if (pdcModeCheck == true && reaperVersion > 6.19) {
-        auto v = pdcModeMap.find(tr);
-        if (v != pdcModeMap.end()) {
-            pdcMode = v->second;
-        }
+    // if (pdcModeCheck == true && reaperVersion > 6.19) {
+    //     auto v = pdcModeMap.find(tr);
+    //     if (v != pdcModeMap.end()) {
+    //         pdcMode = v->second;
+    //     }
+    //     else {
+    char buf[BUFSZCHUNK];
+    (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
+    const regex re("PDC_OPTIONS (\\d+)");
+    cmatch match;
+    regex_search(buf, match, re);
+    string s = string(match[1]);
+    if (s == "0" || s == "2") {
+        pdcMode = stoi(s);
     }
+    //     }
+    // }
 
     const auto instrument = TrackFX_GetInstrument(tr);
 
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
-        double pdc {0};
-        auto trPdc = pdcMap.find(tr);
-        if (trPdc != pdcMap.end()) {
-            auto fxPdc = trPdc->second.find(i);
-            if (fxPdc != trPdc->second.end()) {
-                pdc = fxPdc->second;
-            }
+        auto pdc {0};
+        // auto trPdc = pdcMap.find(tr);
+        // if (trPdc != pdcMap.end()) {
+        //     auto fxPdc = trPdc->second.find(i);
+        //     if (fxPdc != trPdc->second.end()) {
+        //         pdc = fxPdc->second;
+        //     }
+        // }
+        // else {
+        char bufPdc[BUFSZSMALL];
+        (void)TrackFX_GetNamedConfigParm(tr, i, "pdc", bufPdc, BUFSZSMALL);
+        char bufName[BUFSZGUID];
+        (void)TrackFX_GetFXName(tr, i, bufName, BUFSZGUID);
+        if (string(bufName).find("ReaInsert") != string::npos) {
+            (void)strncpy(bufPdc, "32768", BUFSZSMALL);
         }
-        else {
-            char bufPdc[BUFSIZSMALL];
-            while (
-                !TrackFX_GetNamedConfigParm(tr, i, "pdc", bufPdc, BUFSIZSMALL))
-                ;
-            pdc = stod(bufPdc);
+        if (strlen(bufPdc) == 0) {
+            (void)strncpy(bufPdc, "0", BUFSZSMALL);
         }
+        pdc = stoi(bufPdc);
+        // }
 
         const auto isEnabled = TrackFX_GetEnabled(tr, i);
         const auto guid = TrackFX_GetFXGUID(tr, i);
@@ -268,13 +287,14 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
         }
 
         if (pdc > 0) {
-            if (pdcMode == 2) {
-                pdc = ceil(pdc / bsize) * bsize;
+            if (pdcMode == 0) {
+                pdc = (1 + (pdc / bsize)) * bsize;
             }
             pdcTemp = pdcTemp + pdc;
             if (!safe) {
                 if (pdcMode == -1 &&
-                    pdcCurrent + ceil(pdcTemp / bsize) * bsize > pdcLimit) {
+                    (pdcCurrent + (int)(ceil((double)pdcTemp / bsize)) * bsize >
+                     pdcLimit)) {
                     pdcTemp = pdcTemp - pdc;
                     auto k = find(fxToDisable.begin(), fxToDisable.end(), guid);
                     if (k == fxToDisable.end()) {
@@ -282,8 +302,8 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
                     }
                 }
                 else if (
-                    pdcMode == 0 ||
-                    (pdcMode == 2 && pdcCurrent + pdc > pdcLimit)) {
+                    (pdcMode == 0 || pdcMode == 2) &&
+                    pdcCurrent + pdcTemp > pdcLimit) {
                     pdcTemp = pdcTemp - pdc;
                     auto k = find(fxToDisable.begin(), fxToDisable.end(), guid);
                     if (k == fxToDisable.end()) {
@@ -295,7 +315,7 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
     }
 
     if (pdcMode == -1 && pdcTemp > 0) {
-        pdcCurrent = pdcCurrent + ceil(pdcTemp / bsize) * bsize;
+        pdcCurrent = pdcCurrent + (int)(ceil((double)pdcTemp / bsize)) * bsize;
     }
     else if (pdcTemp > 0) {
         pdcCurrent = pdcCurrent + pdcTemp;
@@ -308,10 +328,8 @@ double Llm::GetLatency(MediaTrack* tr, double& pdcCurrent)
     return pdcCurrent;
 }
 
-void Llm::TraverseNetwork(
-    MediaTrack* node,
-    bool checkLatency,
-    double pdcCurrent)
+// traverse recursively through network with dft algoriddim
+void Llm::TraverseNetwork(MediaTrack* node, bool checkLatency, int pdcCurrent)
 {
     if (checkLatency) {
         pdcCurrent = GetLatency(node, pdcCurrent);
@@ -335,6 +353,7 @@ void Llm::TraverseNetwork(
     }
 }
 
+// process trackFXs
 bool Llm::ProcessTrackFXs()
 {
     auto res = false;
@@ -353,8 +372,7 @@ bool Llm::ProcessTrackFXs()
     }
 
     if (!fxToEnable.empty() || !fxToDisable.empty()) {
-        // auto preventCount =
-        //     (int)fxToDisable.size() + (int)fxToEnable.size() + 4;
+        auto preventCount = fxToDisable.size() + fxToEnable.size() + 4;
 
         for (auto i = fxSafe.begin(); i != fxSafe.end();) {
             auto v = fxMap.find(*i);
@@ -366,19 +384,19 @@ bool Llm::ProcessTrackFXs()
             }
         }
 
-        PreventUIRefresh(1);
+        PreventUIRefresh((int)preventCount);
         Undo_BeginBlock();
         SetGlobalAutomationOverride(6);
 
         for (auto&& i : fxToEnable) {
-            const TrackFX& trackFX = fxMap.at(i);
+            auto trackFX = fxMap.at(i);
             if (ValidatePtr2(0, trackFX.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(trackFX.tr, trackFX.fxIdx, true);
             }
         }
 
         for (auto&& i : fxToDisable) {
-            const TrackFX& trackFX = fxMap.at(i);
+            auto trackFX = fxMap.at(i);
             if (ValidatePtr2(0, trackFX.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(trackFX.tr, trackFX.fxIdx, false);
                 fxDisabled.push_back(i);
@@ -386,77 +404,91 @@ bool Llm::ProcessTrackFXs()
         }
 
         SetGlobalAutomationOverride(globalAutomationOverride);
-        Undo_EndBlock("ReaLlm: REAPER Low latency monitoring", -1);
-        PreventUIRefresh(-1);
+        Undo_EndBlock("ReaLlm: REAPER Low latency monitoring", UNDO_STATE_FX);
+        PreventUIRefresh(-1 * (int)preventCount);
         res = true;
     }
     return res;
 }
 
-void Llm::Daemon()
-{
-    while (true) {
-        PdcMap pdcMapTemp;
-        PdcModeMap pdcModeMapTemp;
-        for (auto i = 0; i < GetNumTracks() + 1; i++) {
-            char buf[BUFSIZCHUNK];
-            auto tr = GetTrack(0, i);
-            if (tr == nullptr) {
-                tr = GetMasterTrack(0);
-            }
-            if (ValidatePtr2(0, tr, "MediaTrack*")) {
-                while (!GetTrackStateChunk(tr, buf, BUFSIZCHUNK, false))
-                    ;
-            }
+// background task to collect information
+// void Llm::Daemon()
+// {
+//     // auto projectStateChangeCountPrevious {0};
+//     static auto running = false;
+//     {
+//         scoped_lock lockStart {GetInstance().m};
+//         if (running == false) {
+//             running = true;
+//         }
+//         else {
+//             return;
+//         }
+//     }
+//     while (running == true) {
+//         // auto projectStateChangeCount = GetProjectStateChangeCount(0);
+//         // if (projectStateChangeCount != projectStateChangeCountPrevious) {
+//         //     projectStateChangeCountPrevious = projectStateChangeCount;
 
-            const regex re("PDC_OPTIONS (\\d+)");
-            cmatch match;
-            regex_search(buf, match, re);
-            string s = string(match[1]);
-            if (s == "0" || s == "2") {
-                pdcModeMapTemp.emplace(pair(tr, stoi(s)));
-            }
-            else {
-                pdcModeMapTemp.emplace(pair(tr, -1));
-            }
+//         PdcMap pdcMapTemp;
+//         PdcModeMap pdcModeMapTemp;
+//         for (auto i = 0; i < GetNumTracks() + 1; i++) {
+//             char buf[BUFSZCHUNK];
+//             auto tr = GetTrack(0, i);
+//             if (tr == nullptr) {
+//                 tr = GetMasterTrack(0);
+//             }
 
-            if (ValidatePtr2(0, tr, "MediaTrack*")) {
-                unordered_map<int, double> pdcTemp;
-                for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-                    if (ValidatePtr2(0, tr, "MediaTrack*")) {
-                        char bufPdc[BUFSIZSMALL];
-                        char bufName[BUFSIZGUID];
-                        while (!TrackFX_GetNamedConfigParm(
-                            tr,
-                            j,
-                            "pdc",
-                            bufPdc,
-                            BUFSIZSMALL))
-                            ;
-                        while (!TrackFX_GetFXName(tr, j, bufName, BUFSIZGUID))
-                            ;
-                        if (string(bufName).find("ReaInsert") != string::npos) {
-                            (void)strncpy(bufPdc, "32768", BUFSIZSMALL);
-                        }
-                        pdcTemp.emplace(j, stod(bufPdc));
-                    }
-                }
-                pdcMapTemp.emplace(pair(tr, pdcTemp));
-            }
-        }
-        Llm& llm = GetInstance();
-        scoped_lock lock(llm.m);
-        llm.pdcMap = pdcMapTemp;
-        llm.pdcModeMap = pdcModeMapTemp;
-        if (state == 0) {
-            break;
-        }
-        else {
-            this_thread::sleep_until(llm.now + chrono::milliseconds {30});
-        }
-    }
-    return;
-}
+//             (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
+
+//             const regex re("PDC_OPTIONS (\\d+)");
+//             cmatch match;
+//             regex_search(buf, match, re);
+//             string s = string(match[1]);
+//             if (s == "0" || s == "2") {
+//                 pdcModeMapTemp.emplace(pair(tr, stoi(s)));
+//             }
+//             else {
+//                 pdcModeMapTemp.emplace(pair(tr, -1));
+//             }
+
+//             unordered_map<int, int> pdcTemp;
+//             for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
+//                 tr = nullptr;
+//                 char bufPdc[BUFSZSMALL];
+//                 char bufName[BUFSZGUID];
+//                 (void)TrackFX_GetNamedConfigParm(
+//                     tr,
+//                     j,
+//                     "pdc",
+//                     bufPdc,
+//                     BUFSZSMALL);
+//                 (void)TrackFX_GetFXName(tr, j, bufName, BUFSZGUID);
+//                 if (string(bufName).find("ReaInsert") != string::npos) {
+//                     (void)strncpy(bufPdc, "32768", BUFSZSMALL);
+//                 }
+//                 if (strlen(bufPdc) == 0) {
+//                     (void)strncpy(bufPdc, "0", BUFSZSMALL);
+//                 }
+//                 pdcTemp.emplace(j, stoi(bufPdc));
+//             }
+//             pdcMapTemp.emplace(pair(tr, pdcTemp));
+//             Llm& llm = GetInstance();
+//             scoped_lock lock(llm.m);
+//             llm.pdcMap = pdcMapTemp;
+//             llm.pdcModeMap = pdcModeMapTemp;
+//         }
+
+//         if (state == 0) {
+//             scoped_lock lockEnd {GetInstance().m};
+//             running = false;
+//         }
+//         else {
+//             this_thread::sleep_for(chrono::milliseconds {30});
+//         }
+//     }
+//     return;
+// }
 
 const char* Llm::defstring_Do =
     "void\0bool*\0exitInOptional\0"
@@ -469,44 +501,39 @@ const char* Llm::defstring_Do =
     "action on/off does; "
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 
+// main 'logic'
 void Llm::Do(bool* exit)
 {
     Llm& llm = GetInstance();
     scoped_lock lock(llm.m);
-    llm.now = chrono::steady_clock::now();
 
-    if (state == 0 && exit == nullptr) {
-        thread t {Daemon};
-        t.detach();
-    }
+    auto currentProjectStateChangeCount =
+        GetProjectStateChangeCount(0) + llm.globalAutomationOverride;
 
-    llm.UpdateNetwork();
-    llm.GetSetState(false);
+    if (currentProjectStateChangeCount != llm.projectStateChangeCount ||
+        (exit != nullptr && *exit == true)) {
+        llm.UpdateNetwork();
+        llm.GetSetState(false);
 
-    // auto currentProjectStateChangeCount =
-    //     GetProjectStateChangeCount(0) + llm.globalAutomationOverride;
+        llm.projectStateChangeCount = currentProjectStateChangeCount;
 
-    // if (currentProjectStateChangeCount != llm.projectStateChangeCount) {
-    //     llm.projectStateChangeCount = currentProjectStateChangeCount;
+        llm.pdcMax = 0;
+        for (auto&& i : llm.inputTracks) {
+            llm.TraverseNetwork(i);
+        }
 
-    llm.pdcMax = 0;
-    for (auto&& i : llm.inputTracks) {
-        llm.TraverseNetwork(i);
-    }
-    // }
+        if (llm.bsize == 0 || (exit != nullptr && *exit == true)) {
+            llm.fxToDisable.clear();
+        }
 
-    if (llm.bsize == 0 || (exit != nullptr && *exit == true)) {
-        llm.fxToDisable.clear();
-    }
-
-    auto isSet = llm.ProcessTrackFXs();
-    if (isSet) {
-        llm.GetSetState(true);
-    }
-
-    if (exit != nullptr && *exit == true) {
-        llm.fxGuidMap.clear();
-        llm.fxMap.clear();
+        auto isSet = llm.ProcessTrackFXs();
+        if (isSet) {
+            llm.GetSetState(true);
+        }
+        if (exit != nullptr && *exit == true) {
+            llm.fxGuidMap.clear();
+            llm.fxMap.clear();
+        }
     }
 
     return;
@@ -514,7 +541,7 @@ void Llm::Do(bool* exit)
 
 Llm& Llm::GetInstance()
 {
-    return instance;
+    return *instance;
 }
 
 bool Llm::CommandHook(
@@ -534,8 +561,6 @@ bool Llm::CommandHook(
     if (command == commandId) {
         state = !state;
         if (state == 1) {
-            thread t {Daemon};
-            t.detach();
             plugin_register("timer", (void*)&Do);
         }
         else {
@@ -565,7 +590,8 @@ const char* Llm::defstring_Get =
     "bufOutNeedBig,"
     "bufOutNeedBig_sz,"
     "trInOptional\0"
-    "Get ReaLlm information string. Zero-based indices. Master track index -1. "
+    "Get ReaLlm information string. Zero-based indices. Master track index "
+    "-1. "
     "Optional MediaTrack* tr gets results relative to tr. "
     "Each line (newline '\\n' separated) represents entry. "
     "Tracks are separated with ';'. "
@@ -578,7 +604,8 @@ const char* Llm::defstring_Get =
     "\"track;tr#1;tr#2...\\n\". "
     "Or as \"parent;children\\n\" where first field is parent and rest are "
     "children. "
-    "Or as multiply linked list where first field is node and rest are links. "
+    "Or as multiply linked list where first field is node and rest are "
+    "links. "
     "E.g. \"7;1;-1;\\n\" would mean "
     "\"8th track is connected to 2nd track and Master track.\""
     "\n" //
@@ -753,7 +780,8 @@ const char* Llm::defstring_Set =
     "\n" //
     "P_PDCLIMIT: "
     "Latency limit in samples. Should be multiple of audio block/buffer "
-    "size, in most cases. NOTE: Results depend on audio buffer size, and Track "
+    "size, in most cases. NOTE: Results depend on audio buffer size, and "
+    "Track "
     "FX Chain PDC if P_PDCMODECHECK is enabled."
     "\n" //
     "P_PDCMODECHECK: "
@@ -810,8 +838,11 @@ void Llm::Register(bool load)
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
     }
     else {
-        plugin_register("-timer", (void*)&Do);
         state = 0;
+
+        delete instance;
+
+        plugin_register("-timer", (void*)&Do);
 
         plugin_register("-custom_action", &action);
         plugin_register("-hookcommand2", (void*)&CommandHook);

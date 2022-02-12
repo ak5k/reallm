@@ -18,8 +18,8 @@ class Llm {
     typedef vector<MediaTrack*> TrackVector;
     typedef vector<TrackVector> Routes;
     typedef unordered_map<MediaTrack*, TrackVector> Network;
-    typedef unordered_map<MediaTrack*, unordered_map<int, double>> PdcMap;
-    typedef unordered_map<MediaTrack*, int> PdcModeMap;
+    // typedef unordered_map<MediaTrack*, unordered_map<int, int>> PdcMap;
+    // typedef unordered_map<MediaTrack*, int> PdcModeMap;
     struct TrackFX {
         MediaTrack* tr;
         int trIdx;
@@ -38,7 +38,7 @@ class Llm {
 
   private:
     Llm(); // singleton
-    static Llm instance;
+    static Llm* instance;
 
     bool pdcModeCheck;
     chrono::steady_clock::time_point now;
@@ -49,29 +49,29 @@ class Llm {
     GUIDVector fxToDisable;
     MediaTrack* masterTrack;
     Network network;
-    PdcMap pdcMap;
-    PdcModeMap pdcModeMap;
+    // PdcMap pdcMap;
+    // PdcModeMap pdcModeMap;
     Routes routes;
     TrackVector inputTracks;
     TrackVector stack;
-    double pdcMax;
+    int pdcMax;
     double reaperVersion;
     int bsize;
     int globalAutomationOverride;
     int pdcLimit;
-    // int projectStateChangeCount;
+    int projectStateChangeCount;
     mutex m;
 
     static int commandId;
     static atomic<int> state;
 
     bool ProcessTrackFXs();
-    double GetLatency(MediaTrack* tr, double& pdcCurrent);
+    int GetLatency(MediaTrack* tr, int& pdcCurrent);
     void GetSetState(bool isSet = false);
     void TraverseNetwork(
         MediaTrack* node,
         const bool checkLatency = true,
-        double pdcCurrent = 0);
+        int pdcCurrent = 0);
 
     void UpdateNetwork(MediaTrack* tr = nullptr);
 
