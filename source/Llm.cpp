@@ -64,6 +64,7 @@ void Llm::UpdateNetwork(MediaTrack* tr)
             pdcLimit = bsize;
         }
     }
+
     for (auto i = 0; i < GetNumTracks() + 1; i++) {
         auto node = GetTrack(0, i);
         if (!node) {
@@ -72,6 +73,16 @@ void Llm::UpdateNetwork(MediaTrack* tr)
         if (ValidatePtr2(0, tr, "MediaTrack*") && tr != node) {
             continue;
         }
+
+        auto flags {0};
+        auto trackAutomationMode = GetTrackAutomationMode(node);
+        (void)GetTrackState(node, &flags);
+        if ((flags & 64 && (flags & 128 || flags & 256)) ||
+            (globalAutomationOverride > 1 && globalAutomationOverride < 6) ||
+            (trackAutomationMode > 1 && trackAutomationMode < 6)) {
+            inputTracks.push_back(node);
+        }
+
         if (network.find(node) == network.end()) {
             network[node] = TrackVector {};
         }
@@ -85,13 +96,13 @@ void Llm::UpdateNetwork(MediaTrack* tr)
             network[node].push_back(masterTrack);
         }
 
-        auto flags {0};
-        auto trackAutomationMode = GetTrackAutomationMode(node);
-        (void)GetTrackState(node, &flags);
-        if ((flags & 64 && (flags & 128 || flags & 256)) ||
-            (globalAutomationOverride > 1 && globalAutomationOverride < 6) ||
-            (trackAutomationMode > 1 && trackAutomationMode < 6)) {
-            inputTracks.push_back(node);
+        for (auto j = 0; j < GetTrackNumSends(node, 0); j++) {
+            auto mute = (bool)GetTrackSendInfo_Value(node, 0, j, "B_MUTE");
+            neighbor = (MediaTrack*)(uintptr_t)
+                GetTrackSendInfo_Value(node, 0, j, "P_DESTTRACK");
+            if (!mute) {
+                network[node].push_back(neighbor);
+            }
         }
 
         for (auto j = 0; j < TrackFX_GetCount(node); j++) {
@@ -102,19 +113,6 @@ void Llm::UpdateNetwork(MediaTrack* tr)
                 fxGuidMap.emplace(pair(string(bufGuid), g));
             }
             fxMap.emplace(pair(g, TrackFX(node, i, g, j)));
-        }
-
-        neighbor = node;
-        for (auto j = 0; j < GetTrackNumSends(node, -1); j++) {
-            auto mute = (bool)GetTrackSendInfo_Value(neighbor, -1, j, "B_MUTE");
-            node = (MediaTrack*)(uintptr_t)
-                GetTrackSendInfo_Value(neighbor, -1, j, "P_SRCTRACK");
-            if (!mute) {
-                if (network.find(node) == network.end()) {
-                    network[node] = TrackVector {};
-                }
-                network[node].push_back(neighbor);
-            }
         }
     }
 
@@ -412,83 +410,29 @@ bool Llm::ProcessTrackFXs()
 }
 
 // background task to collect information
-// void Llm::Daemon()
-// {
-//     // auto projectStateChangeCountPrevious {0};
-//     static auto running = false;
-//     {
-//         scoped_lock lockStart {GetInstance().m};
-//         if (running == false) {
-//             running = true;
-//         }
-//         else {
-//             return;
-//         }
-//     }
-//     while (running == true) {
-//         // auto projectStateChangeCount = GetProjectStateChangeCount(0);
-//         // if (projectStateChangeCount != projectStateChangeCountPrevious) {
-//         //     projectStateChangeCountPrevious = projectStateChangeCount;
-
-//         PdcMap pdcMapTemp;
-//         PdcModeMap pdcModeMapTemp;
-//         for (auto i = 0; i < GetNumTracks() + 1; i++) {
-//             char buf[BUFSZCHUNK];
-//             auto tr = GetTrack(0, i);
-//             if (tr == nullptr) {
-//                 tr = GetMasterTrack(0);
-//             }
-
-//             (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
-
-//             const regex re("PDC_OPTIONS (\\d+)");
-//             cmatch match;
-//             regex_search(buf, match, re);
-//             string s = string(match[1]);
-//             if (s == "0" || s == "2") {
-//                 pdcModeMapTemp.emplace(pair(tr, stoi(s)));
-//             }
-//             else {
-//                 pdcModeMapTemp.emplace(pair(tr, -1));
-//             }
-
-//             unordered_map<int, int> pdcTemp;
-//             for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-//                 tr = nullptr;
-//                 char bufPdc[BUFSZSMALL];
-//                 char bufName[BUFSZGUID];
-//                 (void)TrackFX_GetNamedConfigParm(
-//                     tr,
-//                     j,
-//                     "pdc",
-//                     bufPdc,
-//                     BUFSZSMALL);
-//                 (void)TrackFX_GetFXName(tr, j, bufName, BUFSZGUID);
-//                 if (string(bufName).find("ReaInsert") != string::npos) {
-//                     (void)strncpy(bufPdc, "32768", BUFSZSMALL);
-//                 }
-//                 if (strlen(bufPdc) == 0) {
-//                     (void)strncpy(bufPdc, "0", BUFSZSMALL);
-//                 }
-//                 pdcTemp.emplace(j, stoi(bufPdc));
-//             }
-//             pdcMapTemp.emplace(pair(tr, pdcTemp));
-//             Llm& llm = GetInstance();
-//             scoped_lock lock(llm.m);
-//             llm.pdcMap = pdcMapTemp;
-//             llm.pdcModeMap = pdcModeMapTemp;
-//         }
-
-//         if (state == 0) {
-//             scoped_lock lockEnd {GetInstance().m};
-//             running = false;
-//         }
-//         else {
-//             this_thread::sleep_for(chrono::milliseconds {30});
-//         }
-//     }
-//     return;
-// }
+void Llm::Daemon()
+{
+    static auto running = false;
+    {
+        scoped_lock lockStart {GetInstance().m};
+        if (running == false) {
+            running = true;
+        }
+        else {
+            return;
+        }
+    }
+    while (running == true) {
+        if (state == 0) {
+            scoped_lock lockEnd {GetInstance().m};
+            running = false;
+        }
+        else {
+            this_thread::sleep_for(chrono::milliseconds {1});
+        }
+    }
+    return;
+}
 
 const char* Llm::defstring_Do =
     "void\0bool*\0exitInOptional\0"
@@ -507,34 +451,36 @@ void Llm::Do(bool* exit)
     Llm& llm = GetInstance();
     scoped_lock lock(llm.m);
 
-    auto currentProjectStateChangeCount =
-        GetProjectStateChangeCount(0) + llm.globalAutomationOverride;
+    llm.UpdateNetwork();
+    llm.GetSetState(false);
 
-    if (currentProjectStateChangeCount != llm.projectStateChangeCount ||
-        (exit != nullptr && *exit == true)) {
-        llm.UpdateNetwork();
-        llm.GetSetState(false);
+    // auto currentProjectStateChangeCount =
+    //     GetProjectStateChangeCount(0) + llm.globalAutomationOverride;
 
-        llm.projectStateChangeCount = currentProjectStateChangeCount;
+    // if (currentProjectStateChangeCount != llm.projectStateChangeCount ||
+    //     (exit != nullptr && *exit == true)) {
 
-        llm.pdcMax = 0;
-        for (auto&& i : llm.inputTracks) {
-            llm.TraverseNetwork(i);
-        }
+    // llm.projectStateChangeCount = currentProjectStateChangeCount;
 
-        if (llm.bsize == 0 || (exit != nullptr && *exit == true)) {
-            llm.fxToDisable.clear();
-        }
-
-        auto isSet = llm.ProcessTrackFXs();
-        if (isSet) {
-            llm.GetSetState(true);
-        }
-        if (exit != nullptr && *exit == true) {
-            llm.fxGuidMap.clear();
-            llm.fxMap.clear();
-        }
+    llm.pdcMax = 0;
+    for (auto&& i : llm.inputTracks) {
+        llm.TraverseNetwork(i);
     }
+
+    if (llm.bsize == 0 || (exit != nullptr && *exit == true)) {
+        llm.fxToDisable.clear();
+    }
+
+    auto isSet = llm.ProcessTrackFXs();
+    if (isSet) {
+        llm.GetSetState(true);
+    }
+
+    if (exit != nullptr && *exit == true) {
+        llm.fxGuidMap.clear();
+        llm.fxMap.clear();
+    }
+    // }
 
     return;
 }
@@ -561,6 +507,8 @@ bool Llm::CommandHook(
     if (command == commandId) {
         state = !state;
         if (state == 1) {
+            // thread t {Daemon};
+            // t.detach();
             plugin_register("timer", (void*)&Do);
         }
         else {
@@ -762,7 +710,7 @@ void Llm::Get(const char* parmname, char* buf, int bufSz, MediaTrack* tr)
         strncpy(buf, s.c_str(), (size_t)bufSz);
     }
     else {
-        if (n >= bufSz) {
+        if (n > bufSz - 1) {
             n = bufSz - 1;
         }
         strncpy(buf, s.c_str(), (size_t)n);
@@ -840,8 +788,6 @@ void Llm::Register(bool load)
     else {
         state = 0;
 
-        delete instance;
-
         plugin_register("-timer", (void*)&Do);
 
         plugin_register("-custom_action", &action);
@@ -863,6 +809,8 @@ void Llm::Register(bool load)
         plugin_register(
             "-APIvararg_Llm_Set",
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
+
+        delete instance;
     }
     return;
 }
