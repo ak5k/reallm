@@ -1,5 +1,8 @@
-#ifndef _REAPER_API_H
-#define _REAPER_API_H
+#pragma once
+
+#define BUFSZ 64
+#define BUFSZNEEDBIG 32768
+#define BUFSZSMALL 8
 
 #define REAPERAPI_MINIMAL
 #define REAPERAPI_WANT_GetAppVersion
@@ -37,5 +40,3 @@
 #define REAPERAPI_WANT_guidToString
 #define REAPERAPI_WANT_plugin_register
 #define REAPERAPI_WANT_time_precise
-
-#endif
