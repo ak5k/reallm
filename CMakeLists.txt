@@ -92,7 +92,7 @@ if(WIN32)
     $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
 
     # Use relative path to the PDB file to avoid exposing the full path
-    /PDBALTPATH:%_PDB%
+    # /PDBALTPATH:%_PDB%
   )
 else()
   add_compile_options(
@@ -146,7 +146,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 set(REAPER_USER_PLUGINS "UserPlugins")
 
 install(TARGETS ${PROJECT_NAME}
-  CONFIGURATIONS Debug Release
+  # CONFIGURATIONS Debug Release
   RUNTIME DESTINATION "${REAPER_USER_PLUGINS}" # Windows .dll
   LIBRARY DESTINATION "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
 )

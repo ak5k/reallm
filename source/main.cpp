@@ -1,7 +1,8 @@
-#include "llm.hpp"
-#include "node.hpp"
+#include "reaper_api.h"
 #define REAPERAPI_IMPLEMENT
 #include <reaper_plugin_functions.h>
+
+#include "llm.hpp"
 
 extern "C" {
 REAPER_PLUGIN_DLL_EXPORT int ReaperPluginEntry(
@@ -10,7 +11,7 @@ REAPER_PLUGIN_DLL_EXPORT int ReaperPluginEntry(
 {
     (void)hInstance;
     if (!rec) {
-        // llm::Register(false);
+        llm::Register(false);
         return 0;
     }
     else if (
@@ -18,12 +19,7 @@ REAPER_PLUGIN_DLL_EXPORT int ReaperPluginEntry(
         REAPERAPI_LoadAPI(rec->GetFunc)) {
         return 0;
     }
-    // llm::Register(true);
-    MediaTrack* tr = nullptr;
-    Node<MediaTrack*, GUID*, int> n {tr};
-    n.neighborhood();
-    (void)tr;
-    (void)n;
+    llm::Register(true);
     return 1;
 }
 }
