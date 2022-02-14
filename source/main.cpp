@@ -1,4 +1,5 @@
-// #include "llm.hpp"
+#include "llm.hpp"
+#include "node.hpp"
 #define REAPERAPI_IMPLEMENT
 #include <reaper_plugin_functions.h>
 
@@ -18,6 +19,11 @@ REAPER_PLUGIN_DLL_EXPORT int ReaperPluginEntry(
         return 0;
     }
     // llm::Register(true);
+    MediaTrack* tr = nullptr;
+    Node<MediaTrack*, GUID*, int> n {tr};
+    n.neighborhood();
+    (void)tr;
+    (void)n;
     return 1;
 }
 }

@@ -33,6 +33,7 @@ std::unordered_set<T>& Node<T, U, V>::neighborhood()
 template <typename T, typename U, typename V>
 V& Node<T, U, V>::analyze(T& k, V& v)
 {
+    (void)k;
     // auto pdc_mode {-1};
     // auto pdc_temp {0};
 
@@ -46,8 +47,8 @@ V& Node<T, U, V>::analyze(T& k, V& v)
     //         pdcMode = v->second;
     //     }
     //     else {
-    char buf[BUFSZCHUNK];
-    (void)GetTrackStateChunk(k, buf, BUFSZCHUNK, false);
+    // char buf[BUFSZCHUNK];
+    // (void)GetTrackStateChunk(k, buf, BUFSZCHUNK, false);
     // const regex re("PDC_OPTIONS (\\d+)");
     // cmatch match;
     // regex_search(buf, match, re);
