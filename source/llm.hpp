@@ -1,6 +1,7 @@
-#pragma once
+#include <mutex>
 
-#define BUFSZ 64
+#define BUFSZCHUNK 1024
+#define BUFSZGUID 64
 #define BUFSZNEEDBIG 32768
 #define BUFSZSMALL 8
 
@@ -35,8 +36,20 @@
 #define REAPERAPI_WANT_TrackFX_SetEnabled
 #define REAPERAPI_WANT_Undo_BeginBlock
 #define REAPERAPI_WANT_Undo_EndBlock
-#define REAPERAPI_WANT_ValidatePtr
 #define REAPERAPI_WANT_ValidatePtr2
 #define REAPERAPI_WANT_guidToString
 #define REAPERAPI_WANT_plugin_register
 #define REAPERAPI_WANT_time_precise
+
+namespace llm {
+
+extern bool pdc_mode_check;
+extern int command_id;
+extern int pdc_limit;
+extern int pdc_max;
+extern int state;
+extern std::mutex m;
+
+void Register(bool load);
+
+} // namespace llm

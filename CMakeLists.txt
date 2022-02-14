@@ -43,13 +43,13 @@ STRING(TOLOWER "${ARCH_NAME}" ARCH_NAME)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL     ON)
-# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE        ON)
-# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL     ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE        ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 
 if(VCPKG_TOOLCHAIN)
   set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release)
@@ -68,45 +68,45 @@ if(WIN32)
   endforeach()
 
   add_compile_options(
-  #   # Exception handling model
-  #   /EHsc
+    # Exception handling model
+    /EHsc
 
-  #   # Enhance optimized debugging
-  #   $<$<NOT:$<CONFIG:Debug>>:/Zo>
+    # Enhance optimized debugging
+    $<$<NOT:$<CONFIG:Debug>>:/Zo>
 
-  #   # Eliminate duplicate strings
-  #   $<$<NOT:$<CONFIG:Debug>>:/GF>
+    # Eliminate duplicate strings
+    $<$<NOT:$<CONFIG:Debug>>:/GF>
 
-  #   # Enable function-level linking
-  #   $<$<NOT:$<CONFIG:Debug>>:/Gy>
+    # Enable function-level linking
+    $<$<NOT:$<CONFIG:Debug>>:/Gy>
 
-  #   # Remove unreferenced COMDAT
-  #   $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
+    # Remove unreferenced COMDAT
+    $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
   )
 
-  # add_link_options(
-  #   # Remove unreferenced code
-  #   $<$<NOT:$<CONFIG:Debug>>:/OPT:REF>
+  add_link_options(
+    # Remove unreferenced code
+    $<$<NOT:$<CONFIG:Debug>>:/OPT:REF>
 
-  #   # Remove duplicate sections
-  #   $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
+    # Remove duplicate sections
+    $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
 
-  #   # Use relative path to the PDB file to avoid exposing the full path
-  #   /PDBALTPATH:%_PDB%
-  # )
+    # Use relative path to the PDB file to avoid exposing the full path
+    /PDBALTPATH:%_PDB%
+  )
 else()
-  # add_compile_options(
-  #   -fsigned-char -fstack-protector-strong
-  # )
+  add_compile_options(
+    -fsigned-char -fstack-protector-strong
+  )
 
-  # if(APPLE)
-  #   add_link_options(-Wl,-dead_strip)
-  # endif()
+  if(APPLE)
+    add_link_options(-Wl,-dead_strip)
+  endif()
 
-  # check_linker_flag(CXX -Wl,--no-undefined HAVE_NO_UNDEFINED)
-  # if(HAVE_NO_UNDEFINED)
-  #   add_link_options(-Wl,--no-undefined)
-  # endif()
+  check_linker_flag(CXX -Wl,--no-undefined HAVE_NO_UNDEFINED)
+  if(HAVE_NO_UNDEFINED)
+    add_link_options(-Wl,--no-undefined)
+  endif()
 endif()
 
 add_library(common INTERFACE)
@@ -122,26 +122,20 @@ if(WIN32)
   target_compile_definitions(common INTERFACE NOMINMAX UNICODE)
 else()
   target_compile_options(common INTERFACE
-    -Wall -Wextra -Wpedantic -Werror
+    -Wall -Wextra -Wpedantic #-Werror
   )
 
-
-  # Clang 11
-#   check_compiler_flag(CXX -Wnon-c-typedef-for-linkage HAVE_NON_C_TYPEDEF_FOR_LINKAGE)
-#   if(HAVE_NON_C_TYPEDEF_FOR_LINKAGE)
-#     target_compile_options(common INTERFACE -Wno-non-c-typedef-for-linkage)
-#   endif()
 endif()
 
-# check_include_file_cxx(optional HAS_STD_OPTIONAL)
-# if(HAS_STD_OPTIONAL)
-#   target_compile_definitions(common INTERFACE HAS_STD_OPTIONAL)
-# endif()
+check_include_file_cxx(optional HAS_STD_OPTIONAL)
+if(HAS_STD_OPTIONAL)
+  target_compile_definitions(common INTERFACE HAS_STD_OPTIONAL)
+endif()
 
-# check_include_file_cxx(variant HAS_STD_VARIANT)
-# if(HAS_STD_VARIANT)
-#   target_compile_definitions(common INTERFACE HAS_STD_VARIANT)
-# endif()
+check_include_file_cxx(variant HAS_STD_VARIANT)
+if(HAS_STD_VARIANT)
+  target_compile_definitions(common INTERFACE HAS_STD_VARIANT)
+endif()
 
 add_library(${PROJECT_NAME} SHARED)
 
