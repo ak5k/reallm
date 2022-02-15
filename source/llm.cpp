@@ -27,6 +27,7 @@ static int bsize {};
 static int state {};
 static mutex m {};
 static unordered_map<GUID*, TrackFX> fx_map {};
+static unordered_map<string, GUID*> fx_guid_map {};
 static vector<GUID*>* fx_disabled {};
 static vector<GUID*>* fx_to_disable {};
 static vector<GUID*>* fx_safe {};
@@ -196,7 +197,13 @@ static void set_input_tracks(vector<MediaTrack*>& v)
         }
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-            GUID* g = TrackFX_GetFXGUID(tr, j);
+            auto g = TrackFX_GetFXGUID(tr, j);
+            auto v = fx_map.find(g);
+            if (v != fx_map.end()) {
+                char buf[BUFSZGUID];
+                guidToString(g, buf);
+                fx_guid_map.emplace(string {buf}, g);
+            }
             fx_map.insert_or_assign(g, TrackFX {tr, i, g, j});
         }
     }
@@ -287,7 +294,6 @@ static void GetSetState(bool is_set = false)
         (void)SetProjExtState(0, extName, keySafe, s.c_str());
     }
     else {
-        GUID g {};
         string k {};
         stringstream ss {};
 
@@ -308,12 +314,9 @@ static void GetSetState(bool is_set = false)
 
         ss.str(p);
         while (ss >> k) {
-            stringToGuid(k.c_str(), &g);
-            auto v = find_if(fx_map.begin(), fx_map.end(), [g](const auto& v) {
-                return (*v.second.g == g);
-            });
-            if (v != fx_map.end()) {
-                fx_safe->push_back(v->second.g);
+            auto v = fx_guid_map.find(k);
+            if (v != fx_guid_map.end()) {
+                fx_safe->push_back(v->second);
             }
         }
 
@@ -329,12 +332,9 @@ static void GetSetState(bool is_set = false)
         ss.clear();
         ss.str(p);
         while (ss >> k) {
-            stringToGuid(k.c_str(), &g);
-            auto v = find_if(fx_map.begin(), fx_map.end(), [g](const auto& v) {
-                return (*v.second.g == g);
-            });
-            if (v != fx_map.end()) {
-                fx_disabled->push_back(v->second.g);
+            auto v = fx_guid_map.find(k);
+            if (v != fx_guid_map.end()) {
+                fx_disabled->push_back(v->second);
             }
         }
         free(p);
@@ -354,7 +354,7 @@ const char* defstring_Do =
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 static void Do(bool* exit)
 {
-    auto time0 = time_precise();
+    // auto time0 = time_precise();
     scoped_lock lock(m);
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
@@ -429,10 +429,11 @@ static void Do(bool* exit)
 
     if (exit != nullptr && *exit == true) {
         fx_map.clear();
+        fx_guid_map.clear();
     }
 
-    auto time1 = time_precise() - time0;
-    ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    // auto time1 = time_precise() - time0;
+    // ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
 
     return;
 }
