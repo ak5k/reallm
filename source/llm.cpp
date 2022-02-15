@@ -539,6 +539,11 @@ static void Get(
     string s {};
     vector<MediaTrack*> v {};
     input_tracks = &v;
+    vector<GUID*> v1 {}, v2 {}, v3 {};
+    fx_disabled = &v1;
+    fx_to_disable = &v2;
+    fx_safe = &v3;
+
     GetSetState();
 
     if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
@@ -600,8 +605,8 @@ static void Get(
     else if (strcmp(parmname, "P_GRAPH") == 0) {
         unordered_map<MediaTrack*, vector<MediaTrack*>> network;
         for (auto i = 0; i < GetNumTracks(); i++) {
-            // Node<MediaTrack*, GUID*, int> n {GetTrack(0, i)};
-            // network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
+            Node<MediaTrack*, GUID*, int> n {GetTrack(0, i)};
+            network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
         }
         for (auto&& i : network) {
             auto trNum =
@@ -692,15 +697,15 @@ void Register(bool load)
         plugin_register("toggleaction", (void*)&ToggleActionCallback);
 
         plugin_register("API_Llm_Do", (void*)&Do);
-        // plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
-        // plugin_register(
-        //     "APIvararg_Llm_Do",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
-        // plugin_register("API_Llm_Get", (void*)&Get);
-        // plugin_register("APIdef_Llm_Get", (void*)defstring_Get);
-        // plugin_register(
-        //     "APIvararg_Llm_Get",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
+        plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
+        plugin_register(
+            "APIvararg_Llm_Do",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
+        plugin_register("API_Llm_Get", (void*)&Get);
+        plugin_register("APIdef_Llm_Get", (void*)defstring_Get);
+        plugin_register(
+            "APIvararg_Llm_Get",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
         // plugin_register("API_Llm_Set", (void*)&Set);
         // plugin_register("APIdef_Llm_Set", (void*)defstring_Set);
         // plugin_register(
@@ -713,19 +718,19 @@ void Register(bool load)
         plugin_register("-timer", (void*)&Do);
 
         plugin_register("-custom_action", &action);
-        // plugin_register("-hookcommand2", (void*)&CommandHook);
-        // plugin_register("-toggleaction", (void*)&ToggleActionCallback);
+        plugin_register("-hookcommand2", (void*)&CommandHook);
+        plugin_register("-toggleaction", (void*)&ToggleActionCallback);
 
-        // plugin_register("-API_Llm_Do", (void*)&Do);
-        // plugin_register("-APIdef_Llm_Do", (void*)defstring_Do);
-        // plugin_register(
-        //     "-APIvararg_Llm_Do",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
-        // plugin_register("-API_Llm_Get", (void*)&Get);
-        // plugin_register("-APIdef_Llm_Get", (void*)defstring_Get);
-        // plugin_register(
-        //     "-APIvararg_Llm_Get",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
+        plugin_register("-API_Llm_Do", (void*)&Do);
+        plugin_register("-APIdef_Llm_Do", (void*)defstring_Do);
+        plugin_register(
+            "-APIvararg_Llm_Do",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Do>));
+        plugin_register("-API_Llm_Get", (void*)&Get);
+        plugin_register("-APIdef_Llm_Get", (void*)defstring_Get);
+        plugin_register(
+            "-APIvararg_Llm_Get",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
         // plugin_register("-API_Llm_Set", (void*)&Set);
         // plugin_register("-APIdef_Llm_Set", (void*)defstring_Set);
         // plugin_register(

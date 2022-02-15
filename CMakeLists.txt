@@ -121,9 +121,9 @@ if(WIN32)
     )
   target_compile_definitions(common INTERFACE NOMINMAX UNICODE)
 else()
-  # target_compile_options(common INTERFACE
-  #   -Wall -Wextra -Wpedantic -Werror
-  # )
+  target_compile_options(common INTERFACE
+    -Wall -Wextra -Wpedantic -Werror
+  )
 
 endif()
 

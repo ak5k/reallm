@@ -16,6 +16,11 @@ class Node {
     {
     }
 
+    T& get()
+    {
+        return node;
+    }
+
     std::vector<T> get_neighborhood(T& k);
 
     std::vector<std::vector<T>>& get_routes()
@@ -53,7 +58,7 @@ class Node {
         else {
             for (auto i : neighborhood) {
                 if (find(stack.begin(), stack.end(), i) == stack.end()) {
-                    stack.push_back(i);
+                    stack.push_back(k);
                     results = traverse(i, v, do_analyze);
                     stack.pop_back();
                 }
