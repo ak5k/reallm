@@ -372,14 +372,14 @@ static void Do(bool* exit)
 
     set_input_tracks(*input_tracks);
 
-    // auto project_state_change_count_now =
-    //     GetProjectStateChangeCount(0) + global_automation_override;
-    // if (project_state_change_count_now != project_state_change_count) {
-    //     project_state_change_count = project_state_change_count_now;
-    // }
-    // else {
-    //     return;
-    // }
+    auto project_state_change_count_now =
+        GetProjectStateChangeCount(0) + global_automation_override;
+    if (project_state_change_count_now != project_state_change_count) {
+        project_state_change_count = project_state_change_count_now;
+    }
+    else {
+        return;
+    }
 
     vector<GUID*> v1 {}, v2 {}, v3 {};
     fx_disabled = &v1;
