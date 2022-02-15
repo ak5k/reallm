@@ -20,6 +20,7 @@
 #define REAPERAPI_WANT_SetGlobalAutomationOverride
 #define REAPERAPI_WANT_SetProjExtState
 #define REAPERAPI_WANT_ShowConsoleMsg
+#define REAPERAPI_WANT_stringToGuid
 #define REAPERAPI_WANT_TrackFX_GetCount
 #define REAPERAPI_WANT_TrackFX_GetEnabled
 #define REAPERAPI_WANT_TrackFX_GetFXGUID

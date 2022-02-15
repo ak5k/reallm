@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <unordered_map>
 #include <vector>
 
 namespace llm {
@@ -7,8 +8,7 @@ template <typename T, typename U, typename V>
 class Node {
   public:
     Node(T k)
-        : _node {k}
-        , _neighborhood {}
+        : node {k}
         , stack {}
         , routes {}
         , results {}
@@ -16,21 +16,20 @@ class Node {
     {
     }
 
-    T& get()
+    std::vector<T> get_neighborhood(T& k);
+
+    std::vector<std::vector<T>>& get_routes()
     {
-        return _node;
+        return routes;
     }
 
     std::vector<U>& traverse(bool do_analyze)
     {
-        return traverse(_node, res, do_analyze);
+        return traverse(node, res, do_analyze);
     }
 
-    std::vector<T>& neighborhood();
-
   private:
-    T _node;
-    std::vector<T> _neighborhood;
+    T node;
     std::vector<T> stack;
     std::vector<std::vector<T>> routes;
     std::vector<U> results;
@@ -43,15 +42,16 @@ class Node {
         if (do_analyze == true) {
             v = analyze(k, v); // accumulates results
         }
+        auto neighborhood = get_neighborhood(k);
 
-        if (this->neighborhood().empty()) {
+        if (neighborhood.empty()) {
             stack.push_back(k);
             routes.emplace_back(stack);
             stack.pop_back();
             return results;
         }
         else {
-            for (auto i : this->neighborhood()) {
+            for (auto i : neighborhood) {
                 if (find(stack.begin(), stack.end(), i) == stack.end()) {
                     stack.push_back(i);
                     results = traverse(i, v, do_analyze);

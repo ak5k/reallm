@@ -1,8 +1,9 @@
 #include "llm.hpp"
 #include "node.hpp"
+#include <array>
 #include <cmath>
 #include <cstring>
-// #include <future>
+#include <future>
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
@@ -26,7 +27,6 @@ static int bsize {};
 static int state {};
 static mutex m {};
 static unordered_map<GUID*, TrackFX> fx_map {};
-static unordered_map<string, GUID*> fx_guid_map {};
 static vector<GUID*>* fx_disabled {};
 static vector<GUID*>* fx_to_disable {};
 static vector<GUID*>* fx_safe {};
@@ -35,29 +35,29 @@ static vector<MediaTrack*>* input_tracks {};
 template class Node<MediaTrack*, GUID*, int>;
 
 template <typename T, typename U, typename V>
-std::vector<T>& Node<T, U, V>::neighborhood()
+std::vector<T> Node<T, U, V>::get_neighborhood(T& k)
 {
-    _neighborhood.clear();
-    auto _neighbor = GetParentTrack(GetMasterTrack(0));
-    auto link = (bool)GetMediaTrackInfo_Value(_node, "B_MAINSEND");
+    std::vector<T> v {};
+    auto neighbor = GetParentTrack(k);
+    auto link = (bool)GetMediaTrackInfo_Value(k, "B_MAINSEND");
 
-    if (_neighbor && link) {
-        _neighborhood.push_back(_neighbor);
+    if (neighbor && link) {
+        v.push_back(neighbor);
     }
 
-    else if (!_neighbor && link && _node != GetMasterTrack(0)) {
-        _neighborhood.push_back(GetMasterTrack(0));
+    else if (!neighbor && link && k != GetMasterTrack(0)) {
+        v.push_back(GetMasterTrack(0));
     }
 
-    for (auto i = 0; i < GetTrackNumSends(_node, 0); i++) {
-        auto mute = (bool)GetTrackSendInfo_Value(_node, 0, i, "B_MUTE");
-        _neighbor = (MediaTrack*)(uintptr_t)
-            GetTrackSendInfo_Value(_node, 0, i, "P_DESTTRACK");
+    for (auto i = 0; i < GetTrackNumSends(k, 0); i++) {
+        auto mute = (bool)GetTrackSendInfo_Value(k, 0, i, "B_MUTE");
+        neighbor = (MediaTrack*)(uintptr_t)
+            GetTrackSendInfo_Value(k, 0, i, "P_DESTTRACK");
         if (!mute) {
-            _neighborhood.push_back(_neighbor);
+            v.push_back(neighbor);
         }
     }
-    return _neighborhood;
+    return v;
 }
 
 template <typename T, typename U, typename V>
@@ -197,29 +197,21 @@ static void set_input_tracks(vector<MediaTrack*>& v)
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
             GUID* g = TrackFX_GetFXGUID(tr, j);
-            if (fx_map.find(g) == fx_map.end()) {
-                fx_map.emplace(pair {g, TrackFX {tr, i, g, j}});
-                char bufGuid[BUFSZGUID];
-                guidToString(g, bufGuid);
-                fx_guid_map.emplace(pair {string {bufGuid}, g});
-            }
-            else {
-                fx_map.insert(pair {g, TrackFX {tr, i, g, j}});
-            }
+            fx_map.insert_or_assign(g, TrackFX {tr, i, g, j});
         }
     }
     return;
 }
 
-static bool process_fx(unordered_set<GUID*>& fxToDisable)
+static bool process_fx(unordered_set<GUID*>& fx_to_disable)
 {
     auto res = false;
     vector<GUID*> fx_to_enable {};
 
     for (auto i = fx_disabled->begin(); i != fx_disabled->end();) {
-        auto v = find(fxToDisable.begin(), fxToDisable.end(), *i);
-        if (v != fxToDisable.end()) {
-            fxToDisable.erase(v);
+        auto v = find(fx_to_disable.begin(), fx_to_disable.end(), *i);
+        if (v != fx_to_disable.end()) {
+            fx_to_disable.erase(v);
             ++i;
         }
         else {
@@ -228,8 +220,8 @@ static bool process_fx(unordered_set<GUID*>& fxToDisable)
         }
     }
 
-    if (!fx_to_enable.empty() || !fxToDisable.empty()) {
-        auto preventCount = fxToDisable.size() + fx_to_enable.size() + 4;
+    if (!fx_to_enable.empty() || !fx_to_disable.empty()) {
+        auto preventCount = fx_to_disable.size() + fx_to_enable.size() + 4;
 
         for (auto i = fx_safe->begin(); i != fx_safe->end();) {
             auto v = fx_map.find(*i);
@@ -252,7 +244,7 @@ static bool process_fx(unordered_set<GUID*>& fxToDisable)
             }
         }
 
-        for (auto&& i : fxToDisable) {
+        for (auto&& i : fx_to_disable) {
             auto trackFX = fx_map.at(i);
             if (ValidatePtr2(0, trackFX.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(trackFX.tr, trackFX.fx_idx, false);
@@ -268,7 +260,7 @@ static bool process_fx(unordered_set<GUID*>& fxToDisable)
     return res;
 }
 
-void GetSetState(bool is_set = false)
+static void GetSetState(bool is_set = false)
 {
     constexpr char extName[] = "ak5k";
     constexpr char key[] = "ReaLlm";
@@ -295,11 +287,9 @@ void GetSetState(bool is_set = false)
         (void)SetProjExtState(0, extName, keySafe, s.c_str());
     }
     else {
-        fx_disabled->clear();
-        fx_safe->clear();
-
-        string k;
-        stringstream ss;
+        GUID g {};
+        string k {};
+        stringstream ss {};
 
         size_t bufSz = BUFSZNEEDBIG;
         char* p = nullptr;
@@ -318,9 +308,12 @@ void GetSetState(bool is_set = false)
 
         ss.str(p);
         while (ss >> k) {
-            auto v = fx_guid_map.find(k);
-            if (v != fx_guid_map.end()) {
-                fx_safe->push_back(v->second);
+            stringToGuid(k.c_str(), &g);
+            auto v = find_if(fx_map.begin(), fx_map.end(), [g](const auto& v) {
+                return (*v.second.g == g);
+            });
+            if (v != fx_map.end()) {
+                fx_safe->push_back(v->second.g);
             }
         }
 
@@ -336,9 +329,12 @@ void GetSetState(bool is_set = false)
         ss.clear();
         ss.str(p);
         while (ss >> k) {
-            auto v = fx_guid_map.find(k);
-            if (v != fx_guid_map.end()) {
-                fx_disabled->push_back(v->second);
+            stringToGuid(k.c_str(), &g);
+            auto v = find_if(fx_map.begin(), fx_map.end(), [g](const auto& v) {
+                return (*v.second.g == g);
+            });
+            if (v != fx_map.end()) {
+                fx_disabled->push_back(v->second.g);
             }
         }
         free(p);
@@ -346,9 +342,19 @@ void GetSetState(bool is_set = false)
     return;
 }
 
+const char* defstring_Do =
+    "void\0bool*\0exitInOptional\0"
+    "Executes one ReaLlm cycle. "
+    "E.g. for running ReaLlm on custom timer, or deferred. "
+    "Or as 'one shot'. PDC mode check works only with multiple successive "
+    "Llm_Do() calls. "
+    "Optional boolean true performs 'shutdown'. "
+    "In fact, this is what toggling ReaLlm: REAPER Low latency monitoring "
+    "action on/off does; "
+    "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 static void Do(bool* exit)
 {
-    // auto time0 = time_precise();
+    auto time0 = time_precise();
     scoped_lock lock(m);
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
@@ -362,17 +368,18 @@ static void Do(bool* exit)
 
     vector<MediaTrack*> v4 {};
     input_tracks = &v4;
+    input_tracks->reserve(8);
 
     set_input_tracks(*input_tracks);
 
-    auto project_state_change_count_now =
-        GetProjectStateChangeCount(0) + global_automation_override;
-    if (project_state_change_count_now != project_state_change_count) {
-        project_state_change_count = project_state_change_count_now;
-    }
-    else {
-        return;
-    }
+    // auto project_state_change_count_now =
+    //     GetProjectStateChangeCount(0) + global_automation_override;
+    // if (project_state_change_count_now != project_state_change_count) {
+    //     project_state_change_count = project_state_change_count_now;
+    // }
+    // else {
+    //     return;
+    // }
 
     vector<GUID*> v1 {}, v2 {}, v3 {};
     fx_disabled = &v1;
@@ -384,7 +391,7 @@ static void Do(bool* exit)
     if (exit != nullptr && *exit == true) {
         input_tracks->clear();
     }
-    // vector<future<vector<GUID*>>> v;
+    // vector<future<vector<GUID*>>> v {};
     for (auto&& i : *input_tracks) {
         Node<MediaTrack*, GUID*, int> n {i};
         auto& results = n.traverse(true);
@@ -392,10 +399,17 @@ static void Do(bool* exit)
             fx_to_disable->end(),
             results.begin(),
             results.end());
-        // v.push_back(async([&n] { return n.traverse(true); }));
+        // v.emplace_back(async([i] {
+        //     Node<MediaTrack*, GUID*, int> n {i};
+        //     return n.traverse(true);
+        // }));
     }
     // for (auto&& i : v) {
-    //     i.get();
+    //     auto results = i.get();
+    //     fx_to_disable->insert(
+    //         fx_to_disable->end(),
+    //         results.begin(),
+    //         results.end());
     // }
     unordered_set<GUID*> fx_to_disable_unique(
         fx_to_disable->begin(),
@@ -415,11 +429,10 @@ static void Do(bool* exit)
 
     if (exit != nullptr && *exit == true) {
         fx_map.clear();
-        fx_guid_map.clear();
     }
 
-    // auto time1 = time_precise() - time0;
-    // ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    auto time1 = time_precise() - time0;
+    ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
 
     return;
 }
@@ -466,6 +479,202 @@ static int ToggleActionCallback(int command)
         scoped_lock lock(m);
         return state;
     }
+}
+
+const char* defstring_Get =
+    "void\0const char*,char*,int,MediaTrack*\0"
+    "parmname,"
+    "bufOutNeedBig,"
+    "bufOutNeedBig_sz,"
+    "trInOptional\0"
+    "Get ReaLlm information string. Zero-based indices. Master track index "
+    "-1. "
+    "Optional MediaTrack* tr gets results relative to tr. "
+    "Each line (newline '\\n' separated) represents entry. "
+    "Tracks are separated with ';'. "
+    "FX are listed after ':' separated with ','. "
+    "\n" //
+    "P_GRAPH: "
+    "Mixer routings as network graph in format "
+    "\"node;neighborhood\\n\" "
+    "where node is track, and neighborhood is group of tracks in format "
+    "\"track;tr#1;tr#2...\\n\". "
+    "Or as \"parent;children\\n\" where first field is parent and rest are "
+    "children. "
+    "Or as multiply linked list where first field is node and rest are "
+    "links. "
+    "E.g. \"7;1;-1;\\n\" would mean "
+    "\"8th track is connected to 2nd track and Master track.\""
+    "\n" //
+    "P_PDCLATENCY: "
+    "Latency in samples."
+    "\n" //
+    "P_PDCLIMIT: "
+    "Limit in samples."
+    "\n" //
+    "P_PDCMODECHECK: "
+    "Is PDC mode check enabled? \"0\" or \"1\"."
+    "\n" //
+    "P_REALLM or P_STATE: "
+    "Current state of ReaLlm as approach vektors with disabled FX in "
+    "format: "
+    "\"begin:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
+    "E.g. \"3:1,2;0;-1:0\\n\" would be: "
+    "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
+    "Master track, fx#1 disabled."
+    "\n" //
+    "P_SAFE: "
+    "'Safed' plugins as \"track#:fx#\\n\" pairs."
+    "\n" //
+    "P_VECTOR: Same as P_REALLM without FX information. Faster.";
+
+static void Get(
+    const char* parmname,
+    char* buf = nullptr,
+    int bufSz = 0,
+    MediaTrack* tr = nullptr)
+{
+    scoped_lock lock(m);
+    string s {};
+    vector<MediaTrack*> v {};
+    input_tracks = &v;
+    GetSetState();
+
+    if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
+        strcmp(parmname, "P_VECTOR") == 0) {
+        // llm.UpdateNetwork(tr);
+        auto pdc_mode_check_temp = pdc_mode_check;
+        pdc_mode_check = false;
+        if (ValidatePtr2(0, tr, "MediaTrack*")) {
+            input_tracks->push_back(tr);
+        }
+        else {
+            set_input_tracks(*input_tracks);
+        }
+        vector<vector<MediaTrack*>> routes {};
+        for (auto&& i : *input_tracks) {
+            Node<MediaTrack*, GUID*, int> n {i};
+            n.traverse(false);
+            for (auto&& i : n.get_routes()) {
+                routes.push_back(i);
+            }
+        }
+        pdc_mode_check = pdc_mode_check_temp;
+        for (auto&& i : routes) {
+            for (auto&& j : i) {
+                auto trNum =
+                    (int)GetMediaTrackInfo_Value(j, "IP_TRACKNUMBER") - 1;
+                if (trNum < -1) {
+                    trNum = -1;
+                }
+                s.append(to_string(trNum));
+                if (strcmp(parmname, "P_VECTOR") != 0) {
+                    for (auto k = 0; k < TrackFX_GetCount(j); k++) {
+                        if (k == 0) {
+                            s.append(":");
+                        }
+                        auto g = TrackFX_GetFXGUID(j, k);
+                        auto v =
+                            find(fx_disabled->begin(), fx_disabled->end(), g);
+                        if (v != fx_disabled->end()) {
+                            s.append(to_string(k));
+                            s.append(",");
+                        }
+                    }
+                }
+                if (!s.empty() && s.back() == ',') {
+                    s.pop_back();
+                }
+                s.append(";");
+            }
+            if (!s.empty() && s.back() == ';') {
+                s.pop_back();
+            }
+            if (!s.empty()) {
+                s.append("\n");
+            };
+        }
+    }
+
+    else if (strcmp(parmname, "P_GRAPH") == 0) {
+        unordered_map<MediaTrack*, vector<MediaTrack*>> network;
+        for (auto i = 0; i < GetNumTracks(); i++) {
+            // Node<MediaTrack*, GUID*, int> n {GetTrack(0, i)};
+            // network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
+        }
+        for (auto&& i : network) {
+            auto trNum =
+                (int)GetMediaTrackInfo_Value(i.first, "IP_TRACKNUMBER") - 1;
+            if (trNum < -1) {
+                trNum = -1;
+            }
+            s.append(to_string(trNum));
+            s.append(";");
+            for (auto&& j : i.second) {
+                auto trNumNeighbor =
+                    (int)GetMediaTrackInfo_Value(j, "IP_TRACKNUMBER") - 1;
+                if (trNumNeighbor < -1) {
+                    trNumNeighbor = -1;
+                }
+                s.append(to_string(trNumNeighbor));
+                s.append(";");
+            }
+            if (!s.empty() && s.back() == ';') {
+                s.pop_back();
+            }
+            if (!s.empty()) {
+                s.append("\n");
+            };
+        }
+    }
+
+    else if (strcmp(parmname, "P_SAFE") == 0) {
+        set_input_tracks(*input_tracks);
+        for (auto i = fx_safe->begin(); i != fx_safe->end();) {
+            auto v = fx_map.find(*i);
+            if (v == fx_map.end()) {
+                i = fx_safe->erase(i);
+            }
+            else {
+                ++i;
+            }
+        }
+        for (auto&& i : *fx_safe) {
+            s.append(to_string(fx_map.at(i).tr_idx));
+            s.append(":");
+            s.append(to_string(fx_map.at(i).fx_idx));
+            s.append("\n");
+        }
+    }
+
+    else if (strcmp(parmname, "P_PDCLATENCY") == 0) {
+        s.append(to_string((int)(pdc_max + 0.5)));
+    }
+    else if (strcmp(parmname, "P_PDCLIMIT") == 0) {
+        s.append(to_string(pdc_limit));
+    }
+    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
+        if (pdc_mode_check == true) {
+            s.append("1");
+        }
+        else {
+            s.append("0");
+        }
+    }
+
+    auto n = (int)s.size();
+    if (realloc_cmd_ptr(&buf, &bufSz, n)) {
+        strncpy(buf, s.c_str(), (size_t)bufSz);
+    }
+    else {
+        if (n > bufSz - 1) {
+            n = bufSz - 1;
+        }
+        strncpy(buf, s.c_str(), (size_t)n);
+        buf[n + 1] = '\0';
+    }
+
+    return;
 }
 
 void Register(bool load)
