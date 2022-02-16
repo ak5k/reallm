@@ -1,19 +1,22 @@
 #include <algorithm>
-#include <unordered_map>
 #include <vector>
+
+#define VECTORSIZE 8
 
 namespace llm {
 
 template <typename T, typename U, typename V>
-class Node {
+class Network { // : public Node<T> {
   public:
-    Node(T k)
+    Network(T k)
         : node {k}
-        , stack {}
         , routes {}
+        , stack {}
         , results {}
         , res {}
     {
+        routes.reserve(VECTORSIZE);
+        stack.reserve(VECTORSIZE);
     }
 
     T& get()
@@ -23,29 +26,41 @@ class Node {
 
     std::vector<T> get_neighborhood(T& k);
 
+    U get_results()
+    {
+        return results;
+    }
+
+    void set_results(U& r)
+    {
+        results = std::move(r);
+        return;
+    }
+
     std::vector<std::vector<T>>& get_routes()
     {
         return routes;
     }
 
-    std::vector<U>& traverse(bool do_analyze)
+    void traverse(bool do_analyze)
     {
-        return traverse(node, res, do_analyze);
+        traverse(node, results, res, do_analyze);
+        return;
     }
 
   private:
     T node;
-    std::vector<T> stack;
     std::vector<std::vector<T>> routes;
-    std::vector<U> results;
+    std::vector<T> stack;
+    U results;
     V res;
 
-    V& analyze(T& k, V& v);
+    V& analyze(T& k, U& r, V& v);
 
-    std::vector<U>& traverse(T& k, V& v, bool& do_analyze)
+    void traverse(T& k, U& r, V& v, bool& do_analyze)
     {
         if (do_analyze == true) {
-            v = analyze(k, v); // accumulates results
+            v = analyze(k, r, v); // accumulates results
         }
         auto neighborhood = get_neighborhood(k);
 
@@ -53,17 +68,17 @@ class Node {
             stack.push_back(k);
             routes.emplace_back(stack);
             stack.pop_back();
-            return results;
+            return;
         }
         else {
-            for (auto i : neighborhood) {
+            for (auto&& i : neighborhood) {
                 if (find(stack.begin(), stack.end(), i) == stack.end()) {
                     stack.push_back(k);
-                    results = traverse(i, v, do_analyze);
+                    traverse(i, r, v, do_analyze);
                     stack.pop_back();
                 }
             }
-            return results;
+            return;
         }
     }
 };

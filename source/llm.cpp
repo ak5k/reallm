@@ -7,15 +7,18 @@
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
+// #include <unordered_set>
 
+// isolate llm into its own safe space
+namespace llm {
+// 'import' stl stuff
 using namespace std;
 
-namespace llm {
-
+// globals
 static bool pdc_mode_check {false};
 static double reaper_version {};
 static int command_id {};
@@ -24,21 +27,28 @@ static int pdc_limit {};
 static int pdc_max {};
 static int project_state_change_count {0};
 static int bsize {};
-static int state {};
-static mutex m {};
-static unordered_map<GUID*, TrackFX> fx_map {};
-static unordered_map<string, GUID*> fx_guid_map {};
-static vector<GUID*>* fx_disabled {};
-static vector<GUID*>* fx_to_disable {};
-static vector<GUID*>* fx_safe {};
-static vector<MediaTrack*>* input_tracks {};
+static int llm_state {};
+unordered_map<string, GUID*> guid_string_map {};
 
-template class Node<MediaTrack*, GUID*, int>;
+static vector<GUID*>* fx_disabled_g {};
+
+// master lock for thread safety
+static mutex m {};
+
+// help IDE to know types while deving
+template class Network<MediaTrack*, FXResults, int>;
+
+// initialize FXBase static member
+unordered_map<GUID*, FXBase> FXBase::fx_map {};
+
+// assign alias to it
+unordered_map<GUID*, FXBase>& fx_map {FXBase::fx_map};
 
 template <typename T, typename U, typename V>
-std::vector<T> Node<T, U, V>::get_neighborhood(T& k)
+std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
 {
     std::vector<T> v {};
+    v.reserve(VECTORSIZE);
     auto neighbor = GetParentTrack(k);
     auto link = (bool)GetMediaTrackInfo_Value(k, "B_MAINSEND");
 
@@ -62,9 +72,12 @@ std::vector<T> Node<T, U, V>::get_neighborhood(T& k)
 }
 
 template <typename T, typename U, typename V>
-V& Node<T, U, V>::analyze(T& k, V& v)
+V& Network<T, U, V>::analyze(T& k, U& r, V& v)
 {
     auto& tr = k;
+    auto& fx_to_disable = r.fx_to_disable;
+    auto& fx_safe = r.fx_safe;
+    auto& fx_unsafe = r.fx_unsafe;
     auto& pdc_current = v;
     auto pdc_mode {-1};
     auto pdc_temp {0};
@@ -75,7 +88,7 @@ V& Node<T, U, V>::analyze(T& k, V& v)
 
     else if (pdc_mode_check == true && reaper_version > 6.19) {
         char buf[BUFSZCHUNK];
-        (void)GetTrackStateChunk(k, buf, BUFSZCHUNK, false);
+        (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
         const std::regex re("PDC_OPTIONS (\\d+)");
         cmatch match;
         regex_search(buf, match, re);
@@ -87,11 +100,11 @@ V& Node<T, U, V>::analyze(T& k, V& v)
 
     auto instrument = TrackFX_GetInstrument(tr);
 
+    char buf_pdc[BUFSZSMALL];
+    char buf_name[BUFSZGUID];
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
         auto pdc {0};
-        char buf_pdc[BUFSZSMALL];
         (void)TrackFX_GetNamedConfigParm(tr, i, "pdc", buf_pdc, BUFSZSMALL);
-        char buf_name[BUFSZGUID];
         (void)TrackFX_GetFXName(tr, i, buf_name, BUFSZGUID);
         if (string(buf_name).find("ReaInsert") != string::npos) {
             (void)strncpy(buf_pdc, "32768", BUFSZSMALL);
@@ -105,26 +118,26 @@ V& Node<T, U, V>::analyze(T& k, V& v)
         auto guid = TrackFX_GetFXGUID(tr, i);
 
         auto was_disabled = false;
-        if (find(fx_disabled->begin(), fx_disabled->end(), guid) !=
-            fx_disabled->end()) {
+        if (find(fx_disabled_g->cbegin(), fx_disabled_g->cend(), guid) !=
+            fx_disabled_g->cend()) {
             was_disabled = true; // previously disabled by llm
         }
 
         auto safe = false;
         if ((is_enabled && was_disabled) || i == instrument) {
-            fx_safe->push_back(guid);
+            fx_safe.push_back(guid);
             safe = true;
         }
         else if (
-            find(fx_safe->begin(), fx_safe->end(), guid) != fx_safe->end()) {
+            find(fx_safe.cbegin(), fx_safe.cend(), guid) != fx_safe.cend()) {
             safe = true;
         }
 
         if (!is_enabled) {
-            auto k = find(fx_safe->begin(), fx_safe->end(), guid);
-            if (k != fx_safe->end()) {
-                safe = false;
-                fx_safe->erase(k);
+            auto v = find(fx_safe.cbegin(), fx_safe.cend(), guid);
+            if (v != fx_safe.cend()) {
+                // fx_safe.erase(v);
+                fx_unsafe.push_back(*v);
                 was_disabled = true;
             }
         }
@@ -144,18 +157,24 @@ V& Node<T, U, V>::analyze(T& k, V& v)
                          (int)(ceil((double)pdc_temp / bsize)) * bsize >
                      pdc_limit)) {
                     pdc_temp = pdc_temp - pdc;
-                    auto k = find(results.begin(), results.end(), guid);
-                    if (k == results.end()) {
-                        results.push_back(guid);
+                    auto k = find(
+                        fx_to_disable.cbegin(),
+                        fx_to_disable.cend(),
+                        guid);
+                    if (k == fx_to_disable.cend()) {
+                        fx_to_disable.push_back(guid);
                     }
                 }
                 else if (
                     (pdc_mode == 0 || pdc_mode == 2) &&
                     pdc_current + pdc_temp > pdc_limit) {
                     pdc_temp = pdc_temp - pdc;
-                    auto k = find(results.begin(), results.end(), guid);
-                    if (k == results.end()) {
-                        results.push_back(guid);
+                    auto k = find(
+                        fx_to_disable.cbegin(),
+                        fx_to_disable.cend(),
+                        guid);
+                    if (k == fx_to_disable.cend()) {
+                        fx_to_disable.push_back(guid);
                     }
                 }
             }
@@ -177,7 +196,7 @@ V& Node<T, U, V>::analyze(T& k, V& v)
     return pdc_current;
 }
 
-static void set_input_tracks(vector<MediaTrack*>& v)
+static void initialize(vector<MediaTrack*>& v)
 {
     global_automation_override = GetGlobalAutomationOverride();
     for (auto i = 0; i < GetNumTracks() + 1; i++) {
@@ -197,43 +216,37 @@ static void set_input_tracks(vector<MediaTrack*>& v)
         }
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-            auto g = TrackFX_GetFXGUID(tr, j);
-            auto v = fx_map.find(g);
-            if (v != fx_map.end()) {
-                char buf[BUFSZGUID];
-                guidToString(g, buf);
-                fx_guid_map.emplace(string {buf}, g);
-            }
-            fx_map.insert_or_assign(g, TrackFX {tr, i, g, j});
+            FXBase {tr, j};
         }
     }
     return;
 }
 
-static bool process_fx(unordered_set<GUID*>& fx_to_disable)
+static bool process_fx(set<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
 {
     auto res = false;
     vector<GUID*> fx_to_enable {};
+    fx_to_enable.reserve(fx_to_disable.size());
 
-    for (auto i = fx_disabled->begin(); i != fx_disabled->end();) {
+    for (auto i = fx_disabled_g->begin(); i != fx_disabled_g->end();) {
         auto v = find(fx_to_disable.begin(), fx_to_disable.end(), *i);
         if (v != fx_to_disable.end()) {
             fx_to_disable.erase(v);
             ++i;
         }
         else {
-            fx_to_enable.push_back(*i);
-            i = fx_disabled->erase(i);
+            fx_to_enable.push_back(move(*i));
+            i = fx_disabled_g->erase(i);
         }
     }
 
     if (!fx_to_enable.empty() || !fx_to_disable.empty()) {
         auto preventCount = fx_to_disable.size() + fx_to_enable.size() + 4;
 
-        for (auto i = fx_safe->begin(); i != fx_safe->end();) {
+        for (auto i = fx_safe.begin(); i != fx_safe.end();) {
             auto v = fx_map.find(*i);
             if (v == fx_map.end()) {
-                i = fx_safe->erase(i);
+                i = fx_safe.erase(i);
             }
             else {
                 ++i;
@@ -245,40 +258,43 @@ static bool process_fx(unordered_set<GUID*>& fx_to_disable)
         SetGlobalAutomationOverride(6);
 
         for (auto&& i : fx_to_enable) {
-            auto trackFX = fx_map.at(i);
-            if (ValidatePtr2(0, trackFX.tr, "MediaTrack*")) {
-                TrackFX_SetEnabled(trackFX.tr, trackFX.fx_idx, true);
+            auto fx = fx_map.at(i);
+            if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
+                TrackFX_SetEnabled(fx.tr, fx.idx, true);
             }
         }
 
         for (auto&& i : fx_to_disable) {
-            auto trackFX = fx_map.at(i);
-            if (ValidatePtr2(0, trackFX.tr, "MediaTrack*")) {
-                TrackFX_SetEnabled(trackFX.tr, trackFX.fx_idx, false);
-                fx_disabled->push_back(i);
+            auto fx = fx_map.at(i);
+            if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
+                TrackFX_SetEnabled(fx.tr, fx.idx, false);
+                fx_disabled_g->push_back(i);
             }
         }
 
         SetGlobalAutomationOverride(global_automation_override);
         Undo_EndBlock("ReaLlm: REAPER Low latency monitoring", UNDO_STATE_FX);
-        PreventUIRefresh(-1 * (int)preventCount);
+        PreventUIRefresh(-(int)preventCount);
         res = true;
     }
     return res;
 }
 
-static void GetSetState(bool is_set = false)
+static void GetSetState(FXResults& r, bool is_set = false)
 {
     constexpr char extName[] = "ak5k";
     constexpr char key[] = "ReaLlm";
     constexpr char keySafe[] = "ReaLlmSafe";
+
+    auto& fx_disabled = r.fx_disabled;
+    auto& fx_safe = r.fx_safe;
 
     if (is_set) {
         char buf[BUFSZGUID];
         string s;
 
         s.clear();
-        for (auto&& i : *fx_disabled) {
+        for (auto&& i : fx_disabled) {
             guidToString(i, buf);
             s.append(buf);
             s.append(" ");
@@ -286,7 +302,7 @@ static void GetSetState(bool is_set = false)
         (void)SetProjExtState(0, extName, key, s.c_str());
 
         s.clear();
-        for (auto&& i : *fx_safe) {
+        for (auto&& i : fx_safe) {
             guidToString(i, buf);
             s.append(buf);
             s.append(" ");
@@ -314,9 +330,9 @@ static void GetSetState(bool is_set = false)
 
         ss.str(p);
         while (ss >> k) {
-            auto v = fx_guid_map.find(k);
-            if (v != fx_guid_map.end()) {
-                fx_safe->push_back(v->second);
+            auto v = guid_string_map.find(k);
+            if (v != guid_string_map.end()) {
+                fx_safe.push_back(v->second);
             }
         }
 
@@ -332,9 +348,9 @@ static void GetSetState(bool is_set = false)
         ss.clear();
         ss.str(p);
         while (ss >> k) {
-            auto v = fx_guid_map.find(k);
-            if (v != fx_guid_map.end()) {
-                fx_disabled->push_back(v->second);
+            auto v = guid_string_map.find(k);
+            if (v != guid_string_map.end()) {
+                fx_disabled.push_back(v->second);
             }
         }
         free(p);
@@ -366,11 +382,9 @@ static void Do(bool* exit)
         }
     }
 
-    vector<MediaTrack*> v4 {};
-    input_tracks = &v4;
-    input_tracks->reserve(8);
+    vector<MediaTrack*> input_tracks {};
 
-    set_input_tracks(*input_tracks);
+    initialize(input_tracks);
 
     auto project_state_change_count_now =
         GetProjectStateChangeCount(0) + global_automation_override;
@@ -381,55 +395,76 @@ static void Do(bool* exit)
         return;
     }
 
-    vector<GUID*> v1 {}, v2 {}, v3 {};
-    fx_disabled = &v1;
-    fx_to_disable = &v2;
-    fx_safe = &v3;
+    FXResults fx_results {};
 
     pdc_max = 0;
-    GetSetState();
+    GetSetState(fx_results);
+    fx_disabled_g = &fx_results.fx_disabled;
+
     if (exit != nullptr && *exit == true) {
-        input_tracks->clear();
-    }
-    // vector<future<vector<GUID*>>> v {};
-    for (auto&& i : *input_tracks) {
-        Node<MediaTrack*, GUID*, int> n {i};
-        auto& results = n.traverse(true);
-        fx_to_disable->insert(
-            fx_to_disable->end(),
-            results.begin(),
-            results.end());
-        // v.emplace_back(async([i] {
-        //     Node<MediaTrack*, GUID*, int> n {i};
-        //     return n.traverse(true);
-        // }));
-    }
-    // for (auto&& i : v) {
-    //     auto results = i.get();
-    //     fx_to_disable->insert(
-    //         fx_to_disable->end(),
-    //         results.begin(),
-    //         results.end());
-    // }
-    unordered_set<GUID*> fx_to_disable_unique(
-        fx_to_disable->begin(),
-        fx_to_disable->end());
-
-    if (process_fx(fx_to_disable_unique)) {
-        GetSetState(true);
+        input_tracks.clear();
     }
 
-    // auto currentProjectStateChangeCount =
-    //     GetProjectStateChangeCount(0) + llm.globalAutomationOverride;
+    vector<future<FXResults>> v {};
+    v.reserve(input_tracks.size());
+    for (auto&& i : input_tracks) {
+        v.emplace_back(async([i, fx_safe = fx_results.fx_safe] {
+            Network<MediaTrack*, FXResults, int> n {i};
+            FXResults r;
+            r.fx_safe = std::move(fx_safe);
+            n.set_results(r);
+            n.traverse(true);
+            return n.get_results();
+        }));
+    }
 
-    // if (currentProjectStateChangeCount != llm.projectStateChangeCount ||
-    //     (exit != nullptr && *exit == true)) {
+    for (auto&& i : v) {
+        auto results = i.get();
+        fx_results.fx_to_disable.insert(
+            fx_results.fx_to_disable.end(),
+            results.fx_to_disable.begin(),
+            results.fx_to_disable.end());
+        fx_results.fx_safe.insert(
+            fx_results.fx_safe.end(),
+            results.fx_safe.begin(),
+            results.fx_safe.end());
+        fx_results.fx_unsafe.insert(
+            fx_results.fx_unsafe.end(),
+            results.fx_unsafe.begin(),
+            results.fx_unsafe.end());
+    }
 
-    // llm.projectStateChangeCount = currentProjectStateChangeCount;
+    set<GUID*> fx_to_disable_unique(
+        fx_results.fx_to_disable.cbegin(),
+        fx_results.fx_to_disable.cend());
+    set<GUID*> fx_safe_unique(
+        fx_results.fx_safe.cbegin(),
+        fx_results.fx_safe.cend());
+    set<GUID*> fx_unsafe_unique(
+        fx_results.fx_unsafe.cbegin(),
+        fx_results.fx_unsafe.cend());
+
+    fx_results.fx_safe.clear();
+    fx_results.fx_safe.resize(fx_safe_unique.size() - fx_unsafe_unique.size());
+    set_difference(
+        fx_safe_unique.cbegin(),
+        fx_safe_unique.cend(),
+        fx_unsafe_unique.cbegin(),
+        fx_unsafe_unique.cend(),
+        fx_results.fx_safe.begin());
+
+    fx_results.fx_disabled.insert(
+        fx_results.fx_disabled.end(),
+        fx_unsafe_unique.begin(),
+        fx_unsafe_unique.end());
+
+    if (process_fx(fx_to_disable_unique, fx_results.fx_safe)) {
+        GetSetState(fx_results, true);
+    }
 
     if (exit != nullptr && *exit == true) {
         fx_map.clear();
-        fx_guid_map.clear();
+        // fx_guid_map.clear();
     }
 
     // auto time1 = time_precise() - time0;
@@ -455,9 +490,9 @@ static bool CommandHook(
     if (command == command_id) {
         {
             scoped_lock lock(m);
-            state = !state;
+            llm_state = !llm_state;
         }
-        if (state == 1) {
+        if (llm_state == 1) {
             plugin_register("timer", (void*)&Do);
         }
         else {
@@ -478,7 +513,7 @@ static int ToggleActionCallback(int command)
     }
     else {
         scoped_lock lock(m);
-        return state;
+        return llm_state;
     }
 }
 
@@ -537,29 +572,25 @@ static void Get(
 {
     scoped_lock lock(m);
     string s {};
-    vector<MediaTrack*> v {};
-    input_tracks = &v;
-    vector<GUID*> v1 {}, v2 {}, v3 {};
-    fx_disabled = &v1;
-    fx_to_disable = &v2;
-    fx_safe = &v3;
+    vector<MediaTrack*> input_tracks {};
 
-    GetSetState();
+    FXResults fx_results {};
+    GetSetState(fx_results);
+
+    auto& fx_disabled = fx_results.fx_disabled;
+    auto& fx_safe = fx_results.fx_safe;
 
     if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
         strcmp(parmname, "P_VECTOR") == 0) {
-        // llm.UpdateNetwork(tr);
         auto pdc_mode_check_temp = pdc_mode_check;
         pdc_mode_check = false;
+        initialize(input_tracks);
         if (ValidatePtr2(0, tr, "MediaTrack*")) {
-            input_tracks->push_back(tr);
-        }
-        else {
-            set_input_tracks(*input_tracks);
+            input_tracks.push_back(tr);
         }
         vector<vector<MediaTrack*>> routes {};
-        for (auto&& i : *input_tracks) {
-            Node<MediaTrack*, GUID*, int> n {i};
+        for (auto&& i : input_tracks) {
+            Network<MediaTrack*, FXResults, int> n {i};
             n.traverse(false);
             for (auto&& i : n.get_routes()) {
                 routes.push_back(i);
@@ -581,8 +612,8 @@ static void Get(
                         }
                         auto g = TrackFX_GetFXGUID(j, k);
                         auto v =
-                            find(fx_disabled->begin(), fx_disabled->end(), g);
-                        if (v != fx_disabled->end()) {
+                            find(fx_disabled.cbegin(), fx_disabled.cend(), g);
+                        if (v != fx_disabled.cend()) {
                             s.append(to_string(k));
                             s.append(",");
                         }
@@ -605,9 +636,11 @@ static void Get(
     else if (strcmp(parmname, "P_GRAPH") == 0) {
         unordered_map<MediaTrack*, vector<MediaTrack*>> network;
         for (auto i = 0; i < GetNumTracks(); i++) {
-            Node<MediaTrack*, GUID*, int> n {GetTrack(0, i)};
+            Network<MediaTrack*, FXResults, int> n {GetTrack(0, i)};
             network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
         }
+        Network<MediaTrack*, FXResults, int> n {GetMasterTrack(0)};
+        network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
         for (auto&& i : network) {
             auto trNum =
                 (int)GetMediaTrackInfo_Value(i.first, "IP_TRACKNUMBER") - 1;
@@ -635,20 +668,20 @@ static void Get(
     }
 
     else if (strcmp(parmname, "P_SAFE") == 0) {
-        set_input_tracks(*input_tracks);
-        for (auto i = fx_safe->begin(); i != fx_safe->end();) {
+        initialize(input_tracks);
+        for (auto i = fx_safe.begin(); i != fx_safe.end();) {
             auto v = fx_map.find(*i);
             if (v == fx_map.end()) {
-                i = fx_safe->erase(i);
+                i = fx_safe.erase(i);
             }
             else {
                 ++i;
             }
         }
-        for (auto&& i : *fx_safe) {
-            s.append(to_string(fx_map.at(i).tr_idx));
+        for (auto&& i : fx_safe) {
+            s.append(to_string(fx_map.at(i).tr_idx()));
             s.append(":");
-            s.append(to_string(fx_map.at(i).fx_idx));
+            s.append(to_string(fx_map.at(i).idx));
             s.append("\n");
         }
     }
@@ -683,6 +716,40 @@ static void Get(
     return;
 }
 
+const char* defstring_Set =
+    "void\0const char*,const char*\0"
+    "parmname,"
+    "bufIn\0"
+    "Set ReaLlm parameters."
+    "\n" //
+    "P_PDCLIMIT: "
+    "Latency limit in samples. Should be multiple of audio block/buffer "
+    "size, in most cases. NOTE: Results depend on audio buffer size, and "
+    "Track "
+    "FX Chain PDC if P_PDCMODECHECK is enabled."
+    "\n" //
+    "P_PDCMODECHECK: "
+    "Check Track FX Chain PDC mode during Llm_Do(). \"0\" or \"1\".";
+
+void Set(const char* parmname, const char* buf)
+{
+    scoped_lock lock(m);
+
+    if (strcmp(parmname, "P_PDCLIMIT") == 0) {
+        pdc_limit = stoi(buf);
+    }
+
+    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
+        if (stoi(buf) == 0) {
+            pdc_mode_check = false;
+        }
+        else if (stoi(buf) == 1) {
+            pdc_mode_check = true;
+        }
+    }
+
+    return;
+}
 void Register(bool load)
 {
     custom_action_register_t action {
@@ -706,14 +773,14 @@ void Register(bool load)
         plugin_register(
             "APIvararg_Llm_Get",
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
-        // plugin_register("API_Llm_Set", (void*)&Set);
-        // plugin_register("APIdef_Llm_Set", (void*)defstring_Set);
-        // plugin_register(
-        //     "APIvararg_Llm_Set",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
+        plugin_register("API_Llm_Set", (void*)&Set);
+        plugin_register("APIdef_Llm_Set", (void*)defstring_Set);
+        plugin_register(
+            "APIvararg_Llm_Set",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
     }
     else {
-        state = 0;
+        llm_state = 0;
 
         plugin_register("-timer", (void*)&Do);
 
@@ -731,13 +798,11 @@ void Register(bool load)
         plugin_register(
             "-APIvararg_Llm_Get",
             reinterpret_cast<void*>(&InvokeReaScriptAPI<&Get>));
-        // plugin_register("-API_Llm_Set", (void*)&Set);
-        // plugin_register("-APIdef_Llm_Set", (void*)defstring_Set);
-        // plugin_register(
-        //     "-APIvararg_Llm_Set",
-        //     reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
-
-        // delete instance;
+        plugin_register("-API_Llm_Set", (void*)&Set);
+        plugin_register("-APIdef_Llm_Set", (void*)defstring_Set);
+        plugin_register(
+            "-APIvararg_Llm_Set",
+            reinterpret_cast<void*>(&InvokeReaScriptAPI<&Set>));
     }
     return;
 }
