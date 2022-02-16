@@ -75,9 +75,9 @@ template <typename T, typename U, typename V>
 V& Network<T, U, V>::analyze(T& k, U& r, V& v)
 {
     auto& tr = k;
-    auto& fx_to_disable = r.fx_to_disable;
-    auto& fx_safe = r.fx_safe;
-    auto& fx_unsafe = r.fx_unsafe;
+    auto& fx_to_disable = r.to_disable;
+    auto& fx_safe = r.safe;
+    auto& fx_unsafe = r.unsafe;
     auto& pdc_current = v;
     auto pdc_mode {-1};
     auto pdc_temp {0};
@@ -280,14 +280,14 @@ static bool process_fx(set<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
     return res;
 }
 
-static void GetSetState(FXResults& r, bool is_set = false)
+static void get_set_state(FXResults& r, bool is_set = false)
 {
     constexpr char extName[] = "ak5k";
     constexpr char key[] = "ReaLlm";
     constexpr char keySafe[] = "ReaLlmSafe";
 
     auto& fx_disabled = r.fx_disabled;
-    auto& fx_safe = r.fx_safe;
+    auto& fx_safe = r.safe;
 
     if (is_set) {
         char buf[BUFSZGUID];
@@ -395,11 +395,11 @@ static void Do(bool* exit)
         return;
     }
 
-    FXResults fx_results {};
+    FXResults fx_state {};
 
     pdc_max = 0;
-    GetSetState(fx_results);
-    fx_disabled_g = &fx_results.fx_disabled;
+    get_set_state(fx_state);
+    fx_disabled_g = &fx_state.fx_disabled;
 
     if (exit != nullptr && *exit == true) {
         input_tracks.clear();
@@ -408,10 +408,10 @@ static void Do(bool* exit)
     vector<future<FXResults>> v {};
     v.reserve(input_tracks.size());
     for (auto&& i : input_tracks) {
-        v.emplace_back(async([i, fx_safe = fx_results.fx_safe] {
+        v.emplace_back(async([i, fx_safe = fx_state.safe] {
             Network<MediaTrack*, FXResults, int> n {i};
             FXResults r;
-            r.fx_safe = std::move(fx_safe);
+            r.safe = std::move(fx_safe);
             n.set_results(r);
             n.traverse(true);
             return n.get_results();
@@ -420,51 +420,49 @@ static void Do(bool* exit)
 
     for (auto&& i : v) {
         auto results = i.get();
-        fx_results.fx_to_disable.insert(
-            fx_results.fx_to_disable.end(),
-            results.fx_to_disable.begin(),
-            results.fx_to_disable.end());
-        fx_results.fx_safe.insert(
-            fx_results.fx_safe.end(),
-            results.fx_safe.begin(),
-            results.fx_safe.end());
-        fx_results.fx_unsafe.insert(
-            fx_results.fx_unsafe.end(),
-            results.fx_unsafe.begin(),
-            results.fx_unsafe.end());
+        fx_state.to_disable.insert(
+            fx_state.to_disable.end(),
+            results.to_disable.begin(),
+            results.to_disable.end());
+        fx_state.safe.insert(
+            fx_state.safe.end(),
+            results.safe.begin(),
+            results.safe.end());
+        fx_state.unsafe.insert(
+            fx_state.unsafe.end(),
+            results.unsafe.begin(),
+            results.unsafe.end());
     }
 
     set<GUID*> fx_to_disable_unique(
-        fx_results.fx_to_disable.cbegin(),
-        fx_results.fx_to_disable.cend());
-    set<GUID*> fx_safe_unique(
-        fx_results.fx_safe.cbegin(),
-        fx_results.fx_safe.cend());
+        fx_state.to_disable.cbegin(),
+        fx_state.to_disable.cend());
+    set<GUID*> fx_safe_unique(fx_state.safe.cbegin(), fx_state.safe.cend());
     set<GUID*> fx_unsafe_unique(
-        fx_results.fx_unsafe.cbegin(),
-        fx_results.fx_unsafe.cend());
+        fx_state.unsafe.cbegin(),
+        fx_state.unsafe.cend());
 
-    fx_results.fx_safe.clear();
-    fx_results.fx_safe.resize(fx_safe_unique.size() - fx_unsafe_unique.size());
+    fx_state.safe.clear();
+    fx_state.safe.resize(fx_safe_unique.size() - fx_unsafe_unique.size());
     set_difference(
         fx_safe_unique.cbegin(),
         fx_safe_unique.cend(),
         fx_unsafe_unique.cbegin(),
         fx_unsafe_unique.cend(),
-        fx_results.fx_safe.begin());
+        fx_state.safe.begin());
 
-    fx_results.fx_disabled.insert(
-        fx_results.fx_disabled.end(),
+    fx_state.fx_disabled.insert(
+        fx_state.fx_disabled.end(),
         fx_unsafe_unique.begin(),
         fx_unsafe_unique.end());
 
-    if (process_fx(fx_to_disable_unique, fx_results.fx_safe)) {
-        GetSetState(fx_results, true);
+    if (process_fx(fx_to_disable_unique, fx_state.safe)) {
+        get_set_state(fx_state, true);
     }
 
     if (exit != nullptr && *exit == true) {
         fx_map.clear();
-        // fx_guid_map.clear();
+        guid_string_map.clear();
     }
 
     // auto time1 = time_precise() - time0;
@@ -575,10 +573,10 @@ static void Get(
     vector<MediaTrack*> input_tracks {};
 
     FXResults fx_results {};
-    GetSetState(fx_results);
+    get_set_state(fx_results);
 
     auto& fx_disabled = fx_results.fx_disabled;
-    auto& fx_safe = fx_results.fx_safe;
+    auto& fx_safe = fx_results.safe;
 
     if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
         strcmp(parmname, "P_VECTOR") == 0) {

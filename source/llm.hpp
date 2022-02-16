@@ -14,21 +14,21 @@ extern std::unordered_map<std::string, GUID*> guid_string_map;
 
 struct FXResults {
     std::vector<GUID*> fx_disabled;
-    std::vector<GUID*> fx_to_disable;
-    std::vector<GUID*> fx_safe;
-    std::vector<GUID*> fx_unsafe;
+    std::vector<GUID*> to_disable;
+    std::vector<GUID*> safe;
+    std::vector<GUID*> unsafe;
     int pdc;
     FXResults()
         : fx_disabled {}
-        , fx_to_disable {}
-        , fx_safe {}
-        , fx_unsafe {}
+        , to_disable {}
+        , safe {}
+        , unsafe {}
         , pdc {}
     {
         fx_disabled.reserve(BUFSZSMALL);
-        fx_to_disable.reserve(BUFSZSMALL);
-        fx_safe.reserve(BUFSZSMALL);
-        fx_unsafe.reserve(BUFSZSMALL);
+        to_disable.reserve(BUFSZSMALL);
+        safe.reserve(BUFSZSMALL);
+        unsafe.reserve(BUFSZSMALL);
     }
 };
 
