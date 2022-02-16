@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <reaper_plugin_functions.h>
 #include <string>
 #include <unordered_map>
