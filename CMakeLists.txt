@@ -68,6 +68,7 @@ if(WIN32)
   endforeach()
 
   add_compile_options(
+
     # Exception handling model
     /EHsc
 
@@ -91,7 +92,7 @@ if(WIN32)
     # Remove duplicate sections
     $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
 
-    # Use relative path to the PDB file to avoid exposing the full path
+    # # Use relative path to the PDB file to avoid exposing the full path
     # /PDBALTPATH:%_PDB%
   )
 else()
