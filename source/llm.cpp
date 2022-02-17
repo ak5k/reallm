@@ -389,16 +389,16 @@ const char* defstring_Do =
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 static void Do(bool* exit)
 {
-    auto time0 = time_precise();
+    // auto time0 = time_precise();
     scoped_lock lock(m);
-    // auto project_state_change_count_now =
-    //     GetProjectStateChangeCount(0) + global_automation_override;
-    // if (project_state_change_count_now != project_state_change_count) {
-    //     project_state_change_count = project_state_change_count_now;
-    // }
-    // else if (exit != nullptr && *exit != true) {
-    //     return;
-    // }
+    auto project_state_change_count_now =
+        GetProjectStateChangeCount(0) + global_automation_override;
+    if (project_state_change_count_now != project_state_change_count) {
+        project_state_change_count = project_state_change_count_now;
+    }
+    else if (exit != nullptr && *exit != true) {
+        return;
+    }
 
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
@@ -493,8 +493,8 @@ static void Do(bool* exit)
         guid_string_map.clear();
     }
 
-    auto time1 = time_precise() - time0;
-    ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    // auto time1 = time_precise() - time0;
+    // ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
 
     return;
 }
