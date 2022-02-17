@@ -1,7 +1,10 @@
+#include <algorithm>
 #include <limits.h>
 #include <reaper_plugin_functions.h>
+// #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #define BUFSZCHUNK 1024
@@ -13,23 +16,57 @@ namespace llm {
 
 extern std::unordered_map<std::string, GUID*> guid_string_map;
 
-struct FXResults {
+class FXResults {
+  public:
     std::vector<GUID*> fx_disabled;
     std::vector<GUID*> to_disable;
     std::vector<GUID*> safe;
     std::vector<GUID*> unsafe;
     int pdc;
     FXResults()
-        : fx_disabled {}
-        , to_disable {}
-        , safe {}
-        , unsafe {}
-        , pdc {}
+        // : fx_disabled {}
+        // , to_disable {}
+        // , safe {}
+        // , unsafe {}
+        : pdc {}
     {
         fx_disabled.reserve(BUFSZSMALL);
         to_disable.reserve(BUFSZSMALL);
         safe.reserve(BUFSZSMALL);
         unsafe.reserve(BUFSZSMALL);
+    }
+
+    void prepare()
+    {
+        vector_clean_duplicates_and_sort(fx_disabled);
+        vector_clean_duplicates_and_sort(to_disable);
+        vector_clean_duplicates_and_sort(safe);
+        vector_clean_duplicates_and_sort(unsafe);
+        std::vector<GUID*> v;
+        v.resize(safe.size() - unsafe.size());
+        std::set_difference(
+            safe.cbegin(),
+            safe.cend(),
+            unsafe.cbegin(),
+            unsafe.cend(),
+            v.begin());
+
+        safe.assign(v.begin(), v.end());
+        fx_disabled.insert(fx_disabled.end(), unsafe.begin(), unsafe.end());
+        return;
+    }
+
+  private:
+    template <typename T>
+    void vector_clean_duplicates_and_sort(std::vector<T>& v)
+    {
+        std::unordered_set<T> s;
+        for (auto&& i : v) {
+            s.insert(i);
+        }
+        v.assign(s.begin(), s.end());
+        sort(v.begin(), v.end());
+        return;
     }
 };
 

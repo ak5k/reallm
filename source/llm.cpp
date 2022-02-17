@@ -7,7 +7,7 @@
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
-#include <set>
+// #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -28,9 +28,11 @@ static int pdc_max {};
 static int project_state_change_count {0};
 static int bsize {};
 static int llm_state {};
-unordered_map<string, GUID*> guid_string_map {};
 
+static MediaTrack* master_track {};
 static vector<GUID*>* fx_disabled_g {};
+
+unordered_map<string, GUID*> guid_string_map {};
 
 // master lock for thread safety
 static mutex m {};
@@ -47,8 +49,9 @@ unordered_map<GUID*, FXBase>& fx_map {FXBase::fx_map};
 template <typename T, typename U, typename V>
 std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
 {
-    std::vector<T> v {};
-    v.reserve(VECTORSIZE);
+    std::vector<T> v;
+    auto num_sends = GetTrackNumSends(k, 0);
+    v.reserve(num_sends + 1);
     auto neighbor = GetParentTrack(k);
     auto link = (bool)GetMediaTrackInfo_Value(k, "B_MAINSEND");
 
@@ -56,11 +59,11 @@ std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
         v.push_back(neighbor);
     }
 
-    else if (!neighbor && link && k != GetMasterTrack(0)) {
-        v.push_back(GetMasterTrack(0));
+    else if (!neighbor && link && k != master_track) {
+        v.push_back(master_track);
     }
 
-    for (auto i = 0; i < GetTrackNumSends(k, 0); i++) {
+    for (auto i = 0; i < num_sends; i++) {
         auto mute = (bool)GetTrackSendInfo_Value(k, 0, i, "B_MUTE");
         neighbor = (MediaTrack*)(uintptr_t)
             GetTrackSendInfo_Value(k, 0, i, "P_DESTTRACK");
@@ -199,10 +202,11 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
 static void initialize(vector<MediaTrack*>& v)
 {
     global_automation_override = GetGlobalAutomationOverride();
+    master_track = GetMasterTrack(0);
     for (auto i = 0; i < GetNumTracks() + 1; i++) {
         auto tr = GetTrack(0, i);
         if (!tr) {
-            tr = GetMasterTrack(0);
+            tr = master_track;
         }
 
         auto flags {0};
@@ -222,14 +226,14 @@ static void initialize(vector<MediaTrack*>& v)
     return;
 }
 
-static bool process_fx(set<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
+static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
 {
     auto res = false;
     vector<GUID*> fx_to_enable {};
     fx_to_enable.reserve(fx_to_disable.size());
 
-    for (auto i = fx_disabled_g->begin(); i != fx_disabled_g->end();) {
-        auto v = find(fx_to_disable.begin(), fx_to_disable.end(), *i);
+    for (auto i = fx_disabled_g->cbegin(); i != fx_disabled_g->cend();) {
+        auto v = find(fx_to_disable.cbegin(), fx_to_disable.cend(), *i);
         if (v != fx_to_disable.end()) {
             fx_to_disable.erase(v);
             ++i;
@@ -372,14 +376,15 @@ static void Do(bool* exit)
 {
     // auto time0 = time_precise();
     scoped_lock lock(m);
-    auto project_state_change_count_now =
-        GetProjectStateChangeCount(0) + global_automation_override;
-    if (project_state_change_count_now != project_state_change_count) {
-        project_state_change_count = project_state_change_count_now;
-    }
-    else if (exit != nullptr && *exit != true) {
-        return;
-    }
+    // auto project_state_change_count_now =
+    //     GetProjectStateChangeCount(0) + global_automation_override;
+    // if (project_state_change_count_now != project_state_change_count) {
+    //     project_state_change_count = project_state_change_count_now;
+    // }
+    // else if (exit != nullptr && *exit != true) {
+    //     return;
+    // }
+
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
     if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
@@ -433,29 +438,35 @@ static void Do(bool* exit)
             results.unsafe.end());
     }
 
-    set<GUID*> fx_to_disable_unique(
-        fx_state.to_disable.cbegin(),
-        fx_state.to_disable.cend());
-    set<GUID*> fx_safe_unique(fx_state.safe.cbegin(), fx_state.safe.cend());
-    set<GUID*> fx_unsafe_unique(
-        fx_state.unsafe.cbegin(),
-        fx_state.unsafe.cend());
+    // set<GUID*> fx_to_disable_unique(
+    //     fx_state.to_disable.cbegin(),
+    //     fx_state.to_disable.cend());
+    // set<GUID*> fx_safe_unique(fx_state.safe.cbegin(), fx_state.safe.cend());
+    // set<GUID*> fx_unsafe_unique(
+    //     fx_state.unsafe.cbegin(),
+    //     fx_state.unsafe.cend());
 
-    fx_state.safe.clear();
-    fx_state.safe.resize(fx_safe_unique.size() - fx_unsafe_unique.size());
-    set_difference(
-        fx_safe_unique.cbegin(),
-        fx_safe_unique.cend(),
-        fx_unsafe_unique.cbegin(),
-        fx_unsafe_unique.cend(),
-        fx_state.safe.begin());
+    // // vector_clean_duplicates(fx_state.to_disable);
+    // // vector_clean_duplicates(fx_state.safe);
+    // // vector_clean_duplicates(fx_state.unsafe);
 
-    fx_state.fx_disabled.insert(
-        fx_state.fx_disabled.end(),
-        fx_unsafe_unique.begin(),
-        fx_unsafe_unique.end());
+    // fx_state.safe.clear();
+    // fx_state.safe.resize(fx_safe_unique.size() - fx_unsafe_unique.size());
+    // set_difference(
+    //     fx_safe_unique.cbegin(),
+    //     fx_safe_unique.cend(),
+    //     fx_unsafe_unique.cbegin(),
+    //     fx_unsafe_unique.cend(),
+    //     fx_state.safe.begin());
 
-    if (process_fx(fx_to_disable_unique, fx_state.safe)) {
+    // fx_state.fx_disabled.insert(
+    //     fx_state.fx_disabled.end(),
+    //     fx_unsafe_unique.begin(),
+    //     fx_unsafe_unique.end());
+
+    fx_state.prepare();
+
+    if (process_fx(fx_state.to_disable, fx_state.safe)) {
         get_set_state(fx_state, true);
     }
 
@@ -636,7 +647,7 @@ static void Get(
             Network<MediaTrack*, FXResults, int> n {GetTrack(0, i)};
             network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
         }
-        Network<MediaTrack*, FXResults, int> n {GetMasterTrack(0)};
+        Network<MediaTrack*, FXResults, int> n {master_track};
         network.emplace(pair {n.get(), n.get_neighborhood(n.get())});
         for (auto&& i : network) {
             auto trNum =
