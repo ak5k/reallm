@@ -376,14 +376,14 @@ static void Do(bool* exit)
 {
     // auto time0 = time_precise();
     scoped_lock lock(m);
-    // auto project_state_change_count_now =
-    //     GetProjectStateChangeCount(0) + global_automation_override;
-    // if (project_state_change_count_now != project_state_change_count) {
-    //     project_state_change_count = project_state_change_count_now;
-    // }
-    // else if (exit != nullptr && *exit != true) {
-    //     return;
-    // }
+    auto project_state_change_count_now =
+        GetProjectStateChangeCount(0) + global_automation_override;
+    if (project_state_change_count_now != project_state_change_count) {
+        project_state_change_count = project_state_change_count_now;
+    }
+    else if (exit != nullptr && *exit != true) {
+        return;
+    }
 
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
