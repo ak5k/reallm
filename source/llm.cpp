@@ -40,11 +40,15 @@ static mutex m {};
 // help IDE to know types while deving
 template class Network<MediaTrack*, FXResults, int>;
 
-// initialize FXBase static member
-unordered_map<GUID*, FXBase> FXBase::fx_map {};
+// initialize static members
+thread_local unordered_map<GUID*, FX> FX::fx_map {};
+thread_local unordered_map<GUID*, FXExt> FXExt::fx_map_ext {};
+thread_local unordered_map<MediaTrack*, Track> Track::track_map {};
 
-// assign alias to it
-unordered_map<GUID*, FXBase>& fx_map {FXBase::fx_map};
+// assign aliases
+thread_local unordered_map<GUID*, FX>& fx_map {FX::fx_map};
+thread_local unordered_map<GUID*, FXExt>& fx_map_ext {FXExt::fx_map_ext};
+thread_local unordered_map<MediaTrack*, Track>& track_map {Track::track_map};
 
 template <typename T, typename U, typename V>
 std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
@@ -82,43 +86,55 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     auto& fx_safe = r.safe;
     auto& fx_unsafe = r.unsafe;
     auto& pdc_current = v;
-    auto pdc_mode {-1};
     auto pdc_temp {0};
+    auto pdc_mode {-1};
 
-    if (reaper_version < 6.20) {
-        pdc_mode = 0;
-    }
-
-    else if (pdc_mode_check == true && reaper_version > 6.19) {
-        char buf[BUFSZCHUNK];
-        (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
-        const std::regex re("PDC_OPTIONS (\\d+)");
-        cmatch match;
-        regex_search(buf, match, re);
-        string s = string(match[1]);
-        if (s == "0" || s == "2") {
-            pdc_mode = stoi(s);
+    if (pdc_mode_check) {
+        pdc_mode = track_map[tr].pdc_mode;
+        if (pdc_mode == INT_MAX) {
+            pdc_mode = Track(tr, pdc_mode_check, reaper_version).pdc_mode;
         }
     }
+
+    // if (reaper_version < 6.20) {
+    //     pdc_mode = 0;
+    // }
+
+    // else if (pdc_mode_check == true && reaper_version > 6.19) {
+    //     char buf[BUFSZCHUNK];
+    //     (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
+    //     const std::regex re("PDC_OPTIONS (\\d+)");
+    //     cmatch match;
+    //     regex_search(buf, match, re);
+    //     string s = string(match[1]);
+    //     if (s == "0" || s == "2") {
+    //         pdc_mode = stoi(s);
+    //     }
+    // }
 
     auto instrument = TrackFX_GetInstrument(tr);
 
-    char buf_pdc[BUFSZSMALL];
-    char buf_name[BUFSZGUID];
+    // char buf_pdc[BUFSZSMALL];
+    // char buf_name[BUFSZGUID];
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
-        auto pdc {0};
-        (void)TrackFX_GetNamedConfigParm(tr, i, "pdc", buf_pdc, BUFSZSMALL);
-        (void)TrackFX_GetFXName(tr, i, buf_name, BUFSZGUID);
-        if (string(buf_name).find("ReaInsert") != string::npos) {
-            (void)strncpy(buf_pdc, "32768", BUFSZSMALL);
-        }
-        if (strlen(buf_pdc) == 0) {
-            (void)strncpy(buf_pdc, "0", BUFSZSMALL);
-        }
-        pdc = stoi(buf_pdc);
-
-        auto is_enabled = TrackFX_GetEnabled(tr, i);
         auto guid = TrackFX_GetFXGUID(tr, i);
+        auto& fx = fx_map_ext[guid];
+        if (fx.tr_idx() == INT_MAX) {
+            fx = FXExt {tr, i};
+        }
+        // // auto pdc {0};
+        // (void)TrackFX_GetNamedConfigParm(tr, i, "pdc", buf_pdc, BUFSZSMALL);
+        // (void)TrackFX_GetFXName(tr, i, buf_name, BUFSZGUID);
+        // if (string(buf_name).find("ReaInsert") != string::npos) {
+        //     (void)strncpy(buf_pdc, "32768", BUFSZSMALL);
+        // }
+        // if (strlen(buf_pdc) == 0) {
+        //     (void)strncpy(buf_pdc, "0", BUFSZSMALL);
+        // }
+        // pdc = stoi(buf_pdc);
+        auto& pdc = fx.pdc;
+
+        auto& is_enabled = fx.enabled;
 
         auto was_disabled = false;
         if (find(fx_disabled_g->cbegin(), fx_disabled_g->cend(), guid) !=
@@ -139,7 +155,6 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         if (!is_enabled) {
             auto v = find(fx_safe.cbegin(), fx_safe.cend(), guid);
             if (v != fx_safe.cend()) {
-                // fx_safe.erase(v);
                 fx_unsafe.push_back(*v);
                 was_disabled = true;
             }
@@ -220,7 +235,7 @@ static void initialize(vector<MediaTrack*>& v)
         }
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-            FXBase {tr, j};
+            FX {tr, j};
         }
     }
     return;
@@ -374,16 +389,16 @@ const char* defstring_Do =
     "Runs Llm_Do() on default timer, and executes Llm_Do(true) at exit.";
 static void Do(bool* exit)
 {
-    // auto time0 = time_precise();
+    auto time0 = time_precise();
     scoped_lock lock(m);
-    auto project_state_change_count_now =
-        GetProjectStateChangeCount(0) + global_automation_override;
-    if (project_state_change_count_now != project_state_change_count) {
-        project_state_change_count = project_state_change_count_now;
-    }
-    else if (exit != nullptr && *exit != true) {
-        return;
-    }
+    // auto project_state_change_count_now =
+    //     GetProjectStateChangeCount(0) + global_automation_override;
+    // if (project_state_change_count_now != project_state_change_count) {
+    //     project_state_change_count = project_state_change_count_now;
+    // }
+    // else if (exit != nullptr && *exit != true) {
+    //     return;
+    // }
 
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
@@ -411,13 +426,16 @@ static void Do(bool* exit)
 
     vector<future<FXResults>> v {};
     v.reserve(input_tracks.size());
-    for (auto&& i : input_tracks) {
-        v.emplace_back(async([i, fx_safe = fx_state.safe] {
-            Network<MediaTrack*, FXResults, int> n {i};
+    for (auto i : input_tracks) {
+        v.emplace_back(async([tr = i, fx_safe = fx_state.safe] {
+            Network<MediaTrack*, FXResults, int> n {tr};
             FXResults r;
             r.safe = std::move(fx_safe);
             n.set_results(r);
             n.traverse(true);
+            fx_map.clear();
+            fx_map_ext.clear();
+            track_map.clear();
             return n.get_results();
         }));
     }
@@ -475,8 +493,8 @@ static void Do(bool* exit)
         guid_string_map.clear();
     }
 
-    // auto time1 = time_precise() - time0;
-    // ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
+    auto time1 = time_precise() - time0;
+    ShowConsoleMsg((to_string(time1) + string("\n")).c_str());
 
     return;
 }

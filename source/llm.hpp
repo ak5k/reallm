@@ -2,6 +2,8 @@
 #include <limits.h>
 #include <reaper_plugin_functions.h>
 // #include <set>
+#include <cstring>
+#include <regex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -24,10 +26,6 @@ class FXResults {
     std::vector<GUID*> unsafe;
     int pdc;
     FXResults()
-        // : fx_disabled {}
-        // , to_disable {}
-        // , safe {}
-        // , unsafe {}
         : pdc {}
     {
         fx_disabled.reserve(BUFSZSMALL);
@@ -70,13 +68,50 @@ class FXResults {
     }
 };
 
-class FXBase {
+class Track {
+  public:
+    MediaTrack* tr;
+    int pdc_mode;
+    Track()
+        : pdc_mode {INT_MAX}
+    {
+    }
+    Track(
+        MediaTrack* tr,
+        bool pdc_mode_check = false,
+        double reaper_version = 6.20)
+        : tr {tr}
+        , pdc_mode {-1}
+    {
+        if (reaper_version < 6.20) {
+            pdc_mode = 0;
+        }
+        if (pdc_mode_check == true && reaper_version > 6.19) {
+            (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
+            const std::regex re("PDC_OPTIONS (\\d+)");
+            std::cmatch match;
+            regex_search(buf, match, re);
+            std::string s = std::string(match[1]);
+            if (s == "0" || s == "2") {
+                pdc_mode = std::stoi(s);
+            }
+        }
+        track_map[tr] = std::move(*this);
+    }
+
+    thread_local static std::unordered_map<MediaTrack*, Track> track_map;
+
+  private:
+    char buf[BUFSZCHUNK];
+};
+
+class FX {
 
   public:
     MediaTrack* tr;
     int idx;
     GUID* g;
-    FXBase()
+    FX()
         : tr {}
         , idx {}
         , g {}
@@ -84,15 +119,17 @@ class FXBase {
     {
     }
 
-    FXBase(MediaTrack* tr, int fx_idx)
+    FX(MediaTrack* tr, int fx_idx, bool local = false)
         : tr {tr}
         , idx {fx_idx}
         , g {TrackFX_GetFXGUID(tr, fx_idx)}
         , tr_idx_ {INT_MAX}
     {
-        if (fx_map[g].g == nullptr) {
-            guidToString(g, buf);
-            guid_string_map[std::string {buf}] = g;
+        if (!local) {
+            if (fx_map[g].g == nullptr) {
+                guidToString(g, buf);
+                guid_string_map[std::string {buf}] = g;
+            }
         }
         fx_map[g] = std::move(*this);
     }
@@ -109,33 +146,41 @@ class FXBase {
         return tr_idx_;
     }
 
-    static std::unordered_map<GUID*, FXBase> fx_map;
+    thread_local static std::unordered_map<GUID*, FX> fx_map;
 
   private:
     char buf[BUFSZGUID];
     int tr_idx_;
 };
 
-class FX : public FXBase {
+class FXExt : public FX {
   public:
     bool enabled;
-    int pdc;
     char name[BUFSZGUID];
-    FX(MediaTrack* tr, int fx_idx)
-        : FXBase {tr, fx_idx}
-        , enabled {TrackFX_GetEnabled(tr, fx_idx)}
-        , pdc {[this]() {
-            TrackFX_GetNamedConfigParm(
-                this->tr,
-                this->idx,
-                "pdc",
-                this->buf,
-                BUFSZSMALL);
-            return std::atoi(buf);
-        }()}
+    int pdc;
+    FXExt()
+        : FX {}
     {
-        TrackFX_GetFXName(this->tr, this->idx, this->name, BUFSZGUID);
     }
+    FXExt(MediaTrack* tr, int fx_idx)
+        : FX {tr, fx_idx, true}
+        , enabled {TrackFX_GetEnabled(tr, fx_idx)}
+        , name {}
+        , pdc {}
+    {
+        TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
+        TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
+        if (strstr(name, "ReaInsert")) {
+            strncpy(buf, "32768", BUFSZSMALL);
+        }
+        if (strlen(buf) == 0) {
+            strncpy(buf, "0", BUFSZSMALL);
+        }
+        pdc = std::atoi(buf);
+        fx_map_ext[g] = std::move(*this);
+    }
+
+    thread_local static std::unordered_map<GUID*, FXExt> fx_map_ext;
 
   private:
     char buf[BUFSZGUID];
