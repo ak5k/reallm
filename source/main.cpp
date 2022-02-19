@@ -19,7 +19,9 @@ REAPER_PLUGIN_DLL_EXPORT int ReaperPluginEntry(
         REAPERAPI_LoadAPI(rec->GetFunc)) {
         return 0;
     }
+
     llm::Register(true);
+
     return 1;
 }
 }

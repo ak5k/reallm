@@ -8,11 +8,11 @@ namespace llm {
 template <typename T, typename U, typename V>
 class Network { // : public Node<T> {
   public:
-    Network(T k)
+    Network(T k, U& u)
         : node {k}
         , routes {}
         , stack {}
-        , results {}
+        , results {u}
         , res {}
     {
         routes.reserve(VECTORSIZE);
@@ -52,7 +52,7 @@ class Network { // : public Node<T> {
     T node;
     std::vector<std::vector<T>> routes;
     std::vector<T> stack;
-    U results;
+    U& results;
     V res;
 
     V& analyze(T& k, U& r, V& v);

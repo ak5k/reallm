@@ -1,8 +1,7 @@
 #include <algorithm>
+#include <cstring>
 #include <limits.h>
 #include <reaper_plugin_functions.h>
-// #include <set>
-#include <cstring>
 #include <regex>
 #include <string>
 #include <unordered_map>
@@ -18,14 +17,14 @@ namespace llm {
 
 extern std::unordered_map<std::string, GUID*> guid_string_map;
 
-class FXResults {
+class FXState {
   public:
     std::vector<GUID*> fx_disabled;
     std::vector<GUID*> to_disable;
     std::vector<GUID*> safe;
     std::vector<GUID*> unsafe;
     int pdc;
-    FXResults()
+    FXState()
         : pdc {}
     {
         fx_disabled.reserve(BUFSZSMALL);
@@ -73,7 +72,8 @@ class Track {
     MediaTrack* tr;
     int pdc_mode;
     Track()
-        : pdc_mode {INT_MAX}
+        : tr {}
+        , pdc_mode {INT_MAX}
     {
     }
     Track(
@@ -87,19 +87,22 @@ class Track {
             pdc_mode = 0;
         }
         if (pdc_mode_check == true && reaper_version > 6.19) {
-            (void)GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
-            const std::regex re("PDC_OPTIONS (\\d+)");
-            std::cmatch match;
-            regex_search(buf, match, re);
-            std::string s = std::string(match[1]);
-            if (s == "0" || s == "2") {
-                pdc_mode = std::stoi(s);
+            if (ValidatePtr2(0, tr, "MediaTrack*")) {
+                GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
+                const std::regex re("PDC_OPTIONS (\\d+)");
+                std::cmatch match;
+                regex_search(buf, match, re);
+                std::string s = std::string(match[1]);
+                if (s == "0" || s == "2") {
+                    pdc_mode = std::stoi(s);
+                }
             }
         }
         track_map[tr] = std::move(*this);
     }
 
-    thread_local static std::unordered_map<MediaTrack*, Track> track_map;
+    static std::unordered_map<MediaTrack*, Track> track_map;
+    // static std::unordered_map<MediaTrack*, Track> track_map;
 
   private:
     char buf[BUFSZCHUNK];
@@ -146,7 +149,8 @@ class FX {
         return tr_idx_;
     }
 
-    thread_local static std::unordered_map<GUID*, FX> fx_map;
+    static std::unordered_map<GUID*, FX> fx_map;
+    // static std::unordered_map<GUID*, FX> fx_map;
 
   private:
     char buf[BUFSZGUID];
@@ -160,6 +164,8 @@ class FXExt : public FX {
     int pdc;
     FXExt()
         : FX {}
+        , enabled {}
+        , pdc {}
     {
     }
     FXExt(MediaTrack* tr, int fx_idx)
@@ -180,7 +186,8 @@ class FXExt : public FX {
         fx_map_ext[g] = std::move(*this);
     }
 
-    thread_local static std::unordered_map<GUID*, FXExt> fx_map_ext;
+    static std::unordered_map<GUID*, FXExt> fx_map_ext;
+    // static std::unordered_map<GUID*, FXExt> fx_map_ext;
 
   private:
     char buf[BUFSZGUID];
@@ -189,3 +196,9 @@ class FXExt : public FX {
 void Register(bool load);
 
 } // namespace llm
+
+#ifdef WIN32
+// #ifdef _DEBUG
+#include <WDL/win32_printf.h>
+// #endif
+#endif
