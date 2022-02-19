@@ -386,7 +386,7 @@ static void Do(int* param = 0)
         auto project_state_change_count_now =
             GetProjectStateChangeCount(0) + global_automation_override;
         if (project_state_change_count_now != project_state_change_count ||
-            llm_state == 0 && pdc_mode_check) {
+            (llm_state == 0 && pdc_mode_check)) {
             project_state_change_count = project_state_change_count_now;
         }
         else if (timer) {
@@ -478,8 +478,8 @@ static void Do(int* param = 0)
         Track tr_thread;
         tr_thread.track_map.clear();
 
-        // auto time1 = time_precise() - time0;
 #ifdef WIN32
+        // auto time1 = time_precise() - time0;
         // #ifdef _DEBUG
         // wdl_printf("%f%s", time1, "\n");
 // #endif
