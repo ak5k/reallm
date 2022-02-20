@@ -98,7 +98,7 @@ for:
       - cmake --build build
     artifacts:
       - path: build\reaper_reallm*.dll
-      - path: scripts\*.lua
+      #- path: scripts\*.lua
 
 environment:
   matrix:
