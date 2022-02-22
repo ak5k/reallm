@@ -25,7 +25,8 @@ static double reaper_version {};
 static int bsize {};
 static int command_id {};
 static int global_automation_override {};
-static int pdc_limit {};
+static int pdc_limit_abs {};
+static int pdc_limit {1};
 static int pdc_max {};
 static int project_state_change_count {0};
 
@@ -151,7 +152,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
                 if (pdc_mode == -1 &&
                     (pdc_current +
                          (int)(ceil((double)pdc_temp / bsize)) * bsize >
-                     pdc_limit)) {
+                     pdc_limit_abs)) {
                     pdc_temp = pdc_temp - pdc;
                     auto k = find(
                         fx_to_disable.cbegin(),
@@ -163,7 +164,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
                 }
                 else if (
                     (pdc_mode == 0 || pdc_mode == 2) &&
-                    pdc_current + pdc_temp > pdc_limit) {
+                    pdc_current + pdc_temp > pdc_limit_abs) {
                     pdc_temp = pdc_temp - pdc;
                     auto k = find(
                         fx_to_disable.cbegin(),
@@ -401,11 +402,8 @@ static void Do(int* param = 0)
         reaper_version = stod(GetAppVersion());
         char buf[BUFSZSMALL];
         if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
-            auto temp = stoi(buf);
-            if (temp != bsize) {
-                bsize = temp;
-                pdc_limit = bsize;
-            }
+            bsize = stoi(buf);
+            pdc_limit_abs = pdc_limit * bsize;
         }
 
         vector<MediaTrack*> input_tracks {};
@@ -753,10 +751,7 @@ const char* defstring_Set =
     "Set ReaLlm parameters."
     "\n" //
     "P_PDCLIMIT: "
-    "Latency limit in samples. Should be multiple of audio block/buffer "
-    "size, in most cases. NOTE: Results depend on audio buffer size, and "
-    "Track "
-    "FX Chain PDC if P_PDCMODECHECK is enabled."
+    "PDC latency limit in audio blocks/buffers."
     "\n" //
     "P_PDCMODECHECK: "
     "Highly experimental. Check Track FX Chain PDC mode during Llm_Do(). \"0\" "
