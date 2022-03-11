@@ -234,7 +234,7 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
             ++i;
         }
         else {
-            fx_to_enable.push_back(move(*i));
+            fx_to_enable.push_back(*i);
             i = fx_disabled_g->erase(i);
         }
     }
@@ -322,42 +322,59 @@ static void get_set_state(FXState& r, bool is_set = false)
 
         size_t bufSz = BUFSZNEEDBIG;
         char* p = nullptr;
-        if (!p) {
-            while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
-                ;
+        while (true) {
+            auto tmp = (char*)realloc(p, sizeof(char) * bufSz);
+            if (tmp) {
+                p = tmp;
+                break;
+            }
         }
 
         (void)GetProjExtState(0, extName, keySafe, p, (int)bufSz);
-        while (strlen(p) + 1 == bufSz) {
+        while (p && strlen(p) + 1 == bufSz) {
             bufSz = bufSz * 2;
-            while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
-                ;
+            while (true) {
+                auto tmp = (char*)realloc(p, sizeof(char) * bufSz);
+                if (tmp) {
+                    p = tmp;
+                    break;
+                }
+            }
             (void)GetProjExtState(0, extName, keySafe, p, (int)bufSz);
         }
 
-        ss.str(p);
-        while (ss >> k) {
-            auto v = guid_string_map.find(k);
-            if (v != guid_string_map.end()) {
-                fx_safe.push_back(v->second);
+        if (p) {
+            ss.str(p);
+            while (ss >> k) {
+                auto v = guid_string_map.find(k);
+                if (v != guid_string_map.end()) {
+                    fx_safe.push_back(v->second);
+                }
             }
         }
 
         (void)GetProjExtState(0, extName, key, p, (int)bufSz);
-        while (strlen(p) + 1 == bufSz) {
+        while (p && strlen(p) + 1 == bufSz) {
             bufSz = bufSz * 2;
-            while (!(p = (char*)realloc(p, sizeof(char) * bufSz)))
-                ;
+            while (true) {
+                auto tmp = (char*)realloc(p, sizeof(char) * bufSz);
+                if (tmp) {
+                    p = tmp;
+                    break;
+                }
+            }
             (void)GetProjExtState(0, extName, key, p, (int)bufSz);
         }
 
-        k.clear();
-        ss.clear();
-        ss.str(p);
-        while (ss >> k) {
-            auto v = guid_string_map.find(k);
-            if (v != guid_string_map.end()) {
-                fx_disabled.push_back(v->second);
+        if (p) {
+            k.clear();
+            ss.clear();
+            ss.str(p);
+            while (ss >> k) {
+                auto v = guid_string_map.find(k);
+                if (v != guid_string_map.end()) {
+                    fx_disabled.push_back(v->second);
+                }
             }
         }
         free(p);
@@ -511,7 +528,7 @@ static bool CommandHook(
     (void)hwnd;
 
     if (command == command_id) {
-        llm_state = !llm_state;
+        llm_state = ~llm_state;
         static int param = llm_state;
         if (llm_state == 1) {
             if (pdc_mode_check) {

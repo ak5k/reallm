@@ -8,10 +8,10 @@
 #include <unordered_set>
 #include <vector>
 
-#define BUFSZCHUNK 1024
-#define BUFSZGUID 64
-#define BUFSZNEEDBIG 32768
-#define BUFSZSMALL 8
+constexpr auto BUFSZSMALL = 8;
+constexpr auto BUFSZGUID = 64;
+constexpr auto BUFSZCHUNK = 1024;
+constexpr auto BUFSZNEEDBIG = 32768;
 
 namespace llm {
 
@@ -105,7 +105,7 @@ class Track {
     // static std::unordered_map<MediaTrack*, Track> track_map;
 
   private:
-    char buf[BUFSZCHUNK];
+    char buf[BUFSZCHUNK] = {0};
 };
 
 class FX {
@@ -153,18 +153,19 @@ class FX {
     // static std::unordered_map<GUID*, FX> fx_map;
 
   private:
-    char buf[BUFSZGUID];
+    char buf[BUFSZGUID] = {0};
     int tr_idx_;
 };
 
 class FXExt : public FX {
   public:
     bool enabled;
-    char name[BUFSZGUID];
+    char name[BUFSZGUID] = {0};
     int pdc;
     FXExt()
         : FX {}
         , enabled {}
+        , name {}
         , pdc {}
     {
     }
@@ -176,13 +177,13 @@ class FXExt : public FX {
     {
         TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
         TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
-        if (strstr(name, "ReaInsert")) {
-            strncpy(buf, "32768", BUFSZSMALL);
-        }
         if (strlen(buf) == 0) {
             strncpy(buf, "0", BUFSZSMALL);
         }
         pdc = std::atoi(buf);
+        if (strstr(name, "ReaInsert")) {
+            pdc = BUFSZNEEDBIG;
+        }
         fx_map_ext[g] = std::move(*this);
     }
 
@@ -190,7 +191,7 @@ class FXExt : public FX {
     // static std::unordered_map<GUID*, FXExt> fx_map_ext;
 
   private:
-    char buf[BUFSZGUID];
+    char buf[BUFSZGUID] = {0};
 };
 
 void Register(bool load);
