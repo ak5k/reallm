@@ -389,12 +389,24 @@ const char* defstring_Do =
     "0 or nothing performs shutdown. "
     "Disarming/disabling all monitored inputs and calling with parameter value "
     "1 equals to shutdown.";
-static void Do(int* param = 0)
+
+bool timer {false};
+
+static void Do();
+
+static void Do2(int* param = 0)
 {
-    bool timer {false};
-    if (param != 0 && !(*param == 1 || *param == 0)) {
+    if (param != 0 && (*param == 1)) {
         timer = true;
     }
+    else {
+        timer = false;
+    }
+    Do();
+}
+
+static void Do()
+{
     while (true) {
         if (pdc_mode_check) {
             using namespace std::chrono_literals;
@@ -433,7 +445,7 @@ static void Do(int* param = 0)
         get_set_state(fx_state);
         fx_disabled_g = &fx_state.fx_disabled;
 
-        if ((param == 0 || *param == 0) || llm_state_current == 0) {
+        if (llm_state_current == 0) {
             input_tracks.clear();
         }
 
@@ -529,11 +541,11 @@ static bool CommandHook(
 
     if (command == command_id) {
         llm_state = !llm_state;
-        static int param = llm_state;
+        // static int param = llm_state;
         if (llm_state == 1) {
             if (pdc_mode_check) {
-                thread t(Do, &param);
-                t.detach();
+                // thread t(Do, &param);
+                // t.detach();
             }
             else {
                 plugin_register("timer", (void*)&Do);
@@ -542,7 +554,8 @@ static bool CommandHook(
         else {
             if (!pdc_mode_check) {
                 plugin_register("-timer", (void*)&Do);
-                Do(&param); // exitInOptional is true
+                timer = false;
+                Do(); // exitInOptional is true
                 guid_string_map.clear();
             }
         }
@@ -808,7 +821,7 @@ void Register(bool load)
         plugin_register("hookcommand2", (void*)&CommandHook);
         plugin_register("toggleaction", (void*)&ToggleActionCallback);
 
-        plugin_register("API_Llm_Do", (void*)&Do);
+        plugin_register("API_Llm_Do", (void*)&Do2);
         plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
         plugin_register(
             "APIvararg_Llm_Do",
@@ -832,7 +845,7 @@ void Register(bool load)
         plugin_register("-hookcommand2", (void*)&CommandHook);
         plugin_register("-toggleaction", (void*)&ToggleActionCallback);
 
-        plugin_register("-API_Llm_Do", (void*)&Do);
+        plugin_register("-API_Llm_Do", (void*)&Do2);
         plugin_register("-APIdef_Llm_Do", (void*)defstring_Do);
         plugin_register(
             "-APIvararg_Llm_Do",
