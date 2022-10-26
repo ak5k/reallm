@@ -541,7 +541,7 @@ static bool CommandHook(
 
     if (command == command_id) {
         llm_state = !llm_state;
-        static int param = llm_state;
+        // static int param = llm_state;
         if (llm_state == 1) {
             if (pdc_mode_check) {
                 // thread t(Do, &param);
