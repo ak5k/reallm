@@ -7,11 +7,9 @@
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
-// #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-// #include <unordered_set>
 
 // isolate llm into its own safe space
 namespace llm {
@@ -20,7 +18,6 @@ using namespace std;
 
 // globals
 static atomic<int> llm_state {};
-static atomic<bool> pdc_mode_check {false};
 static double reaper_version {};
 static int bsize {};
 static int command_id {};
@@ -96,13 +93,6 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         return v;
     }
 
-    if (pdc_mode_check) {
-        pdc_mode = track_map[tr].pdc_mode;
-        if (pdc_mode == INT_MAX) {
-            pdc_mode = Track(tr, pdc_mode_check, reaper_version).pdc_mode;
-        }
-    }
-
     auto instrument = TrackFX_GetInstrument(tr);
 
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
@@ -112,6 +102,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
             fx = FXExt {tr, i};
         }
         auto& pdc = fx.pdc;
+        pdc_mode = fx.pdc_mode;
 
         auto& is_enabled = fx.enabled;
 
@@ -144,35 +135,13 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         }
 
         if (pdc > 0) {
-            if (pdc_mode == 0) {
-                pdc = (1 + (pdc / bsize)) * bsize;
-            }
             pdc_temp = pdc_temp + pdc;
-            if (!safe) {
-                if (pdc_mode == -1 &&
-                    (pdc_current +
-                         (int)(ceil((double)pdc_temp / bsize)) * bsize >
-                     pdc_limit_abs)) {
-                    pdc_temp = pdc_temp - pdc;
-                    auto k = find(
-                        fx_to_disable.cbegin(),
-                        fx_to_disable.cend(),
-                        guid);
-                    if (k == fx_to_disable.cend()) {
-                        fx_to_disable.push_back(guid);
-                    }
-                }
-                else if (
-                    (pdc_mode == 0 || pdc_mode == 2) &&
-                    pdc_current + pdc_temp > pdc_limit_abs) {
-                    pdc_temp = pdc_temp - pdc;
-                    auto k = find(
-                        fx_to_disable.cbegin(),
-                        fx_to_disable.cend(),
-                        guid);
-                    if (k == fx_to_disable.cend()) {
-                        fx_to_disable.push_back(guid);
-                    }
+            if (!safe && pdc_current + pdc_temp > pdc_limit_abs) {
+                pdc_temp = pdc_temp - pdc;
+                auto k =
+                    find(fx_to_disable.cbegin(), fx_to_disable.cend(), guid);
+                if (k == fx_to_disable.cend()) {
+                    fx_to_disable.push_back(guid);
                 }
             }
         }
@@ -408,22 +377,14 @@ static void Do2(int* param = 0)
 static void Do()
 {
     while (true) {
-        if (pdc_mode_check) {
-            using namespace std::chrono_literals;
-            this_thread::sleep_for(30ms);
-        }
         // auto time0 = time_precise();
         auto project_state_change_count_now =
             GetProjectStateChangeCount(0) + global_automation_override;
-        if (project_state_change_count_now != project_state_change_count ||
-            (llm_state == 0 && pdc_mode_check)) {
+        if (project_state_change_count_now != project_state_change_count) {
             project_state_change_count = project_state_change_count_now;
         }
         else if (timer) {
             return;
-        }
-        else if (pdc_mode_check) {
-            continue;
         }
         scoped_lock lk(m);
         auto llm_state_current = llm_state.load();
@@ -450,49 +411,11 @@ static void Do()
         }
 
         // vector<future<FXState>> v {};
-        // if (pdc_mode_check) {
-        //     v.reserve(input_tracks.size());
-        // }
 
         for (auto&& i : input_tracks) {
-            // if (pdc_mode_check) {
-            //     v.emplace_back(async([tr = i, fx_safe = fx_state.safe]() {
-            //         FXState r;
-            //         r.safe = std::move(fx_safe);
-            //         Network<MediaTrack*, FXState, int> n {tr, r};
-            //         n.set_results(r);
-            //         n.traverse(true);
-            //         FXExt fx;
-            //         fx.fx_map_ext.clear();
-            //         fx.fx_map.clear();
-            //         Track tr_thread;
-            //         tr_thread.track_map.clear();
-            //         return n.get_results();
-            //     }));
-            // }
-            // else {
             Network<MediaTrack*, FXState, int> n {i, fx_state};
             n.traverse(true);
-            // }
         }
-
-        // if (pdc_mode_check) {
-        //     for (auto&& i : v) {
-        //         auto results = i.get();
-        //         fx_state.to_disable.insert(
-        //             fx_state.to_disable.end(),
-        //             results.to_disable.begin(),
-        //             results.to_disable.end());
-        //         fx_state.safe.insert(
-        //             fx_state.safe.end(),
-        //             results.safe.begin(),
-        //             results.safe.end());
-        //         fx_state.unsafe.insert(
-        //             fx_state.unsafe.end(),
-        //             results.unsafe.begin(),
-        //             results.unsafe.end());
-        //     }
-        // }
 
         fx_state.prepare();
 
@@ -511,7 +434,7 @@ static void Do()
         // wdl_printf("%f%s", time1, "\n");
 // #endif
 #endif
-        if (timer || llm_state_current == 0 || !pdc_mode_check) {
+        if (timer || llm_state_current == 0) {
             break;
         }
     }
@@ -543,21 +466,13 @@ static bool CommandHook(
         llm_state = !llm_state;
         // static int param = llm_state;
         if (llm_state == 1) {
-            if (pdc_mode_check) {
-                // thread t(Do, &param);
-                // t.detach();
-            }
-            else {
-                plugin_register("timer", (void*)&Do);
-            }
+            plugin_register("timer", (void*)&Do);
         }
         else {
-            if (!pdc_mode_check) {
-                plugin_register("-timer", (void*)&Do);
-                timer = false;
-                Do(); // exitInOptional is true
-                guid_string_map.clear();
-            }
+            plugin_register("-timer", (void*)&Do);
+            timer = false;
+            Do(); // exitInOptional is true
+            guid_string_map.clear();
         }
         return true;
     }
@@ -606,9 +521,6 @@ const char* defstring_Get =
     "P_PDCLIMIT: "
     "Limit in samples."
     "\n" //
-    "P_PDCMODECHECK: "
-    "Is PDC mode check enabled? \"0\" or \"1\"."
-    "\n" //
     "P_REALLM or P_STATE: "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
@@ -640,8 +552,6 @@ static void Get(
 
     if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
         strcmp(parmname, "P_VECTOR") == 0) {
-        auto pdc_mode_check_temp = pdc_mode_check.load();
-        pdc_mode_check = false;
         initialize(input_tracks);
         if (ValidatePtr2(0, tr, "MediaTrack*")) {
             input_tracks.push_back(tr);
@@ -654,7 +564,6 @@ static void Get(
                 routes.push_back(i);
             }
         }
-        pdc_mode_check = pdc_mode_check_temp;
         for (auto&& i : routes) {
             for (auto&& j : i) {
                 auto trNum =
@@ -750,14 +659,6 @@ static void Get(
     else if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         s.append(to_string(pdc_limit));
     }
-    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
-        if (pdc_mode_check == true) {
-            s.append("1");
-        }
-        else {
-            s.append("0");
-        }
-    }
 
     auto n = (int)s.size();
     if (realloc_cmd_ptr(&buf, &bufSz, n)) {
@@ -783,9 +684,7 @@ const char* defstring_Set =
     "P_PDCLIMIT: "
     "PDC latency limit in audio blocks/buffers."
     "\n" //
-    "P_PDCMODECHECK: "
-    "Highly experimental. Check Track FX Chain PDC mode during Llm_Do(). \"0\" "
-    "or \"1\".";
+    ;
 
 void Set(const char* parmname, const char* buf)
 {
@@ -793,17 +692,6 @@ void Set(const char* parmname, const char* buf)
 
     if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         pdc_limit = stoi(buf);
-    }
-
-    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
-        if (stoi(buf) == 0) {
-            pdc_mode_check = false;
-            plugin_register("-timer", (void*)&Do);
-        }
-        else if (stoi(buf) == 1) {
-            pdc_mode_check = true;
-            plugin_register("-timer", (void*)&Do);
-        }
     }
 
     return;

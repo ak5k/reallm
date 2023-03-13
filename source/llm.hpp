@@ -162,11 +162,13 @@ class FXExt : public FX {
     bool enabled;
     char name[BUFSZGUID] = {0};
     int pdc;
+    int pdc_mode;
     FXExt()
         : FX {}
         , enabled {}
         , name {}
         , pdc {}
+        , pdc_mode {}
     {
     }
     FXExt(MediaTrack* tr, int fx_idx)
@@ -174,6 +176,7 @@ class FXExt : public FX {
         , enabled {TrackFX_GetEnabled(tr, fx_idx)}
         , name {}
         , pdc {}
+        , pdc_mode {}
     {
         TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
         TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
@@ -181,6 +184,11 @@ class FXExt : public FX {
             strncpy(buf, "0", BUFSZSMALL);
         }
         pdc = std::atoi(buf);
+        TrackFX_GetNamedConfigParm(tr, idx, "pdc_mode", buf, BUFSZSMALL);
+        if (strlen(buf) == 0) {
+            strncpy(buf, "0", BUFSZSMALL);
+        }
+        pdc_mode = std::atoi(buf);
         if (strstr(name, "ReaInsert")) {
             pdc = BUFSZNEEDBIG;
         }
