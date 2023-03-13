@@ -23,6 +23,8 @@ class FXState {
     std::vector<GUID*> to_disable;
     std::vector<GUID*> safe;
     std::vector<GUID*> unsafe;
+    std::unordered_set<GUID*> tr_pdc_disabled;
+    std::unordered_set<GUID*> tr_pdc_to_disable;
     int pdc;
     FXState()
         : pdc {}
@@ -70,30 +72,37 @@ class FXState {
 class Track {
   public:
     MediaTrack* tr;
+    GUID* tr_g;
     Track()
         : tr {}
+        , tr_g {}
     {
     }
     Track(MediaTrack* tr)
         : tr {tr}
+        , tr_g {GetTrackGUID(tr)}
     {
-        track_map[tr] = std::move(*this);
+        if (track_map[tr_g].tr_g == nullptr) {
+            guidToString(tr_g, buf);
+            guid_string_map[std::string {buf}] = tr_g;
+        }
+        track_map[tr_g] = std::move(*this);
     }
 
-    static std::unordered_map<MediaTrack*, Track> track_map;
+    static std::unordered_map<GUID*, Track> track_map;
 
   private:
     char buf[BUFSZCHUNK] = {0};
 };
 
-class FX {
-
+class FX : public Track {
   public:
     MediaTrack* tr;
     int idx;
     GUID* g;
     FX()
-        : tr {}
+        : Track {}
+        , tr {}
         , idx {}
         , g {}
         , tr_idx_ {INT_MAX}
@@ -101,7 +110,8 @@ class FX {
     }
 
     FX(MediaTrack* tr, int fx_idx, bool local = false)
-        : tr {tr}
+        : Track {tr}
+        , tr {tr}
         , idx {fx_idx}
         , g {TrackFX_GetFXGUID(tr, fx_idx)}
         , tr_idx_ {INT_MAX}

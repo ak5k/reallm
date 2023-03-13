@@ -10,6 +10,7 @@
 #define REAPERAPI_WANT_GetProjectStateChangeCount
 #define REAPERAPI_WANT_GetTrack
 #define REAPERAPI_WANT_GetTrackAutomationMode
+#define REAPERAPI_WANT_GetTrackGUID
 #define REAPERAPI_WANT_GetTrackName
 #define REAPERAPI_WANT_GetTrackNumSends
 #define REAPERAPI_WANT_GetTrackSendInfo_Value
