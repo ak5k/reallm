@@ -453,16 +453,17 @@ static void Do()
 {
     // while (true) {
     // auto time0 = time_precise();
+    auto llm_state_current = llm_state.load();
     auto project_state_change_count_now =
         GetProjectStateChangeCount(0) + global_automation_override;
-    if (project_state_change_count_now != project_state_change_count) {
+    if (project_state_change_count_now != project_state_change_count ||
+        (llm_state_current == 0 && !timer)) {
         project_state_change_count = project_state_change_count_now;
     }
     else {
         return;
     }
     scoped_lock lk(m);
-    auto llm_state_current = llm_state.load();
 
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
