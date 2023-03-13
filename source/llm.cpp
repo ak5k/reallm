@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 // isolate llm into its own safe space
 namespace llm {
@@ -224,11 +225,14 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
         PreventUIRefresh((int)preventCount);
         Undo_BeginBlock();
         SetGlobalAutomationOverride(6);
+        unordered_map<MediaTrack*, int> tracks_to_enable {};
+        unordered_map<MediaTrack*, int> tracks_to_disable {};
 
         for (auto&& i : fx_to_enable) {
             auto fx = fx_map.at(i);
             if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(fx.tr, fx.idx, true);
+                tracks_to_enable.insert_or_assign(fx.tr, fx.idx);
             }
         }
 
@@ -237,7 +241,16 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
             if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(fx.tr, fx.idx, false);
                 fx_disabled_g->push_back(i);
+                tracks_to_disable.insert_or_assign(fx.tr, fx.idx);
             }
+        }
+
+        for (auto&& i : tracks_to_enable) {
+            TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "1");
+        }
+
+        for (auto&& i : tracks_to_disable) {
+            TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "2");
         }
 
         SetGlobalAutomationOverride(global_automation_override);
