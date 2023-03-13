@@ -87,7 +87,6 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     auto& pdc_current = v;
     auto& track_map = Track().track_map;
     auto pdc_temp {0};
-    auto pdc_mode {-1};
 
     if (!ValidatePtr2(0, tr, "MediaTrack*")) {
         return v;
@@ -102,7 +101,6 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
             fx = FXExt {tr, i};
         }
         auto& pdc = fx.pdc;
-        pdc_mode = fx.pdc_mode;
 
         auto& is_enabled = fx.enabled;
 
@@ -147,11 +145,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         }
     }
 
-    if (pdc_mode == -1 && pdc_temp > 0) {
-        pdc_current =
-            pdc_current + (int)(ceil((double)pdc_temp / bsize)) * bsize;
-    }
-    else if (pdc_temp > 0) {
+    if (pdc_temp > 0) {
         pdc_current = pdc_current + pdc_temp;
     }
 
@@ -244,13 +238,21 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
             }
         }
 
-        // for (auto&& i : tracks_to_enable) {
-        //     TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "1");
-        // }
+        for (auto&& i : tracks_to_enable) {
+            TrackFX_SetNamedConfigParm(
+                i.first,
+                i.second,
+                "chain_pdc_mode",
+                "1");
+        }
 
-        // for (auto&& i : tracks_to_disable) {
-        //     TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "2");
-        // }
+        for (auto&& i : tracks_to_disable) {
+            TrackFX_SetNamedConfigParm(
+                i.first,
+                i.second,
+                "chain_pdc_mode",
+                "2");
+        }
 
         SetGlobalAutomationOverride(global_automation_override);
         Undo_EndBlock("ReaLlm: REAPER Low latency monitoring", UNDO_STATE_FX);
@@ -446,9 +448,10 @@ static void Do()
         // wdl_printf("%f%s", time1, "\n");
 // #endif
 #endif
-        if (timer || llm_state_current == 0) {
-            break;
-        }
+        // if (timer || llm_state_current == 0) {
+        //     break;
+        // }
+        break;
     }
 
     if (!timer) {

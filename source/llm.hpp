@@ -70,39 +70,17 @@ class FXState {
 class Track {
   public:
     MediaTrack* tr;
-    int pdc_mode;
     Track()
         : tr {}
-        , pdc_mode {INT_MAX}
     {
     }
-    Track(
-        MediaTrack* tr,
-        bool pdc_mode_check = false,
-        double reaper_version = 6.20)
+    Track(MediaTrack* tr)
         : tr {tr}
-        , pdc_mode {-1}
     {
-        if (reaper_version < 6.20) {
-            pdc_mode = 0;
-        }
-        if (pdc_mode_check == true && reaper_version > 6.19) {
-            if (ValidatePtr2(0, tr, "MediaTrack*")) {
-                GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
-                const std::regex re("PDC_OPTIONS (\\d+)");
-                std::cmatch match;
-                regex_search(buf, match, re);
-                std::string s = std::string(match[1]);
-                if (s == "0" || s == "2") {
-                    pdc_mode = std::stoi(s);
-                }
-            }
-        }
         track_map[tr] = std::move(*this);
     }
 
     static std::unordered_map<MediaTrack*, Track> track_map;
-    // static std::unordered_map<MediaTrack*, Track> track_map;
 
   private:
     char buf[BUFSZCHUNK] = {0};
@@ -162,13 +140,11 @@ class FXExt : public FX {
     bool enabled;
     char name[BUFSZGUID] = {0};
     int pdc;
-    int pdc_mode;
     FXExt()
         : FX {}
         , enabled {}
         , name {}
         , pdc {}
-        , pdc_mode {}
     {
     }
     FXExt(MediaTrack* tr, int fx_idx)
@@ -176,7 +152,6 @@ class FXExt : public FX {
         , enabled {TrackFX_GetEnabled(tr, fx_idx)}
         , name {}
         , pdc {}
-        , pdc_mode {}
     {
         TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
         TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
@@ -184,11 +159,6 @@ class FXExt : public FX {
             strncpy(buf, "0", BUFSZSMALL);
         }
         pdc = std::atoi(buf);
-        TrackFX_GetNamedConfigParm(tr, idx, "pdc_mode", buf, BUFSZSMALL);
-        if (strlen(buf) == 0) {
-            strncpy(buf, "0", BUFSZSMALL);
-        }
-        pdc_mode = std::atoi(buf);
         if (strstr(name, "ReaInsert")) {
             pdc = BUFSZNEEDBIG;
         }
