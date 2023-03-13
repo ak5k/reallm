@@ -23,6 +23,8 @@ class FXState {
     std::vector<GUID*> to_disable;
     std::vector<GUID*> safe;
     std::vector<GUID*> unsafe;
+    std::unordered_set<GUID*> tr_pdc_disabled;
+    std::unordered_set<GUID*> tr_pdc_to_disable;
     int pdc;
     FXState()
         : pdc {}
@@ -70,52 +72,37 @@ class FXState {
 class Track {
   public:
     MediaTrack* tr;
-    int pdc_mode;
+    GUID* tr_g;
     Track()
         : tr {}
-        , pdc_mode {INT_MAX}
+        , tr_g {}
     {
     }
-    Track(
-        MediaTrack* tr,
-        bool pdc_mode_check = false,
-        double reaper_version = 6.20)
+    Track(MediaTrack* tr)
         : tr {tr}
-        , pdc_mode {-1}
+        , tr_g {GetTrackGUID(tr)}
     {
-        if (reaper_version < 6.20) {
-            pdc_mode = 0;
+        if (track_map[tr_g].tr_g == nullptr) {
+            guidToString(tr_g, buf);
+            guid_string_map[std::string {buf}] = tr_g;
         }
-        if (pdc_mode_check == true && reaper_version > 6.19) {
-            if (ValidatePtr2(0, tr, "MediaTrack*")) {
-                GetTrackStateChunk(tr, buf, BUFSZCHUNK, false);
-                const std::regex re("PDC_OPTIONS (\\d+)");
-                std::cmatch match;
-                regex_search(buf, match, re);
-                std::string s = std::string(match[1]);
-                if (s == "0" || s == "2") {
-                    pdc_mode = std::stoi(s);
-                }
-            }
-        }
-        track_map[tr] = std::move(*this);
+        track_map[tr_g] = std::move(*this);
     }
 
-    static std::unordered_map<MediaTrack*, Track> track_map;
-    // static std::unordered_map<MediaTrack*, Track> track_map;
+    static std::unordered_map<GUID*, Track> track_map;
 
   private:
     char buf[BUFSZCHUNK] = {0};
 };
 
-class FX {
-
+class FX : public Track {
   public:
     MediaTrack* tr;
     int idx;
     GUID* g;
     FX()
-        : tr {}
+        : Track {}
+        , tr {}
         , idx {}
         , g {}
         , tr_idx_ {INT_MAX}
@@ -123,7 +110,8 @@ class FX {
     }
 
     FX(MediaTrack* tr, int fx_idx, bool local = false)
-        : tr {tr}
+        : Track {tr}
+        , tr {tr}
         , idx {fx_idx}
         , g {TrackFX_GetFXGUID(tr, fx_idx)}
         , tr_idx_ {INT_MAX}

@@ -7,11 +7,10 @@
 #include <reaper_plugin_functions.h>
 #include <reascript_vararg.hpp>
 #include <regex>
-// #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-// #include <unordered_set>
+#include <unordered_set>
 
 // isolate llm into its own safe space
 namespace llm {
@@ -20,7 +19,6 @@ using namespace std;
 
 // globals
 static atomic<int> llm_state {};
-static atomic<bool> pdc_mode_check {false};
 static double reaper_version {};
 static int bsize {};
 static int command_id {};
@@ -31,7 +29,6 @@ static int pdc_max {};
 static int project_state_change_count {0};
 
 static MediaTrack* master_track {};
-static vector<GUID*>* fx_disabled_g {};
 
 unordered_map<string, GUID*> guid_string_map {};
 
@@ -44,12 +41,12 @@ template class Network<MediaTrack*, FXState, int>;
 // initialize static members
 unordered_map<GUID*, FX> FX::fx_map {};
 unordered_map<GUID*, FXExt> FXExt::fx_map_ext {};
-unordered_map<MediaTrack*, Track> Track::track_map {};
+unordered_map<GUID*, Track> Track::track_map {};
 
 // // assign aliases
 unordered_map<GUID*, FX>& fx_map {FX::fx_map};
 unordered_map<GUID*, FXExt>& fx_map_ext {FXExt::fx_map_ext};
-unordered_map<MediaTrack*, Track>& track_map {Track::track_map};
+unordered_map<GUID*, Track>& track_map {Track::track_map};
 
 template <typename T, typename U, typename V>
 std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
@@ -85,23 +82,20 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     auto& tr = k;
     auto& fx_map_ext = FXExt().fx_map_ext;
     auto& fx_to_disable = r.to_disable;
+    auto& fx_disabled = r.fx_disabled;
     auto& fx_safe = r.safe;
     auto& fx_unsafe = r.unsafe;
     auto& pdc_current = v;
-    auto& track_map = Track().track_map;
+    auto& tr_pdc_to_disable = r.tr_pdc_to_disable;
+    // auto& track_map = Track().track_map;
     auto pdc_temp {0};
-    auto pdc_mode {-1};
 
     if (!ValidatePtr2(0, tr, "MediaTrack*")) {
         return v;
     }
 
-    if (pdc_mode_check) {
-        pdc_mode = track_map[tr].pdc_mode;
-        if (pdc_mode == INT_MAX) {
-            pdc_mode = Track(tr, pdc_mode_check, reaper_version).pdc_mode;
-        }
-    }
+    // (void)Track(tr);
+    tr_pdc_to_disable.insert(GetTrackGUID(tr));
 
     auto instrument = TrackFX_GetInstrument(tr);
 
@@ -116,8 +110,8 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         auto& is_enabled = fx.enabled;
 
         auto was_disabled = false;
-        if (find(fx_disabled_g->cbegin(), fx_disabled_g->cend(), guid) !=
-            fx_disabled_g->cend()) {
+        if (find(fx_disabled.cbegin(), fx_disabled.cend(), guid) !=
+            fx_disabled.cend()) {
             was_disabled = true; // previously disabled by llm
         }
 
@@ -144,45 +138,19 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         }
 
         if (pdc > 0) {
-            if (pdc_mode == 0) {
-                pdc = (1 + (pdc / bsize)) * bsize;
-            }
             pdc_temp = pdc_temp + pdc;
-            if (!safe) {
-                if (pdc_mode == -1 &&
-                    (pdc_current +
-                         (int)(ceil((double)pdc_temp / bsize)) * bsize >
-                     pdc_limit_abs)) {
-                    pdc_temp = pdc_temp - pdc;
-                    auto k = find(
-                        fx_to_disable.cbegin(),
-                        fx_to_disable.cend(),
-                        guid);
-                    if (k == fx_to_disable.cend()) {
-                        fx_to_disable.push_back(guid);
-                    }
-                }
-                else if (
-                    (pdc_mode == 0 || pdc_mode == 2) &&
-                    pdc_current + pdc_temp > pdc_limit_abs) {
-                    pdc_temp = pdc_temp - pdc;
-                    auto k = find(
-                        fx_to_disable.cbegin(),
-                        fx_to_disable.cend(),
-                        guid);
-                    if (k == fx_to_disable.cend()) {
-                        fx_to_disable.push_back(guid);
-                    }
+            if (!safe && pdc_current + pdc_temp > pdc_limit_abs) {
+                pdc_temp = pdc_temp - pdc;
+                auto k =
+                    find(fx_to_disable.cbegin(), fx_to_disable.cend(), guid);
+                if (k == fx_to_disable.cend()) {
+                    fx_to_disable.push_back(guid);
                 }
             }
         }
     }
 
-    if (pdc_mode == -1 && pdc_temp > 0) {
-        pdc_current =
-            pdc_current + (int)(ceil((double)pdc_temp / bsize)) * bsize;
-    }
-    else if (pdc_temp > 0) {
+    if (pdc_temp > 0) {
         pdc_current = pdc_current + pdc_temp;
     }
 
@@ -203,6 +171,7 @@ static void initialize(vector<MediaTrack*>& v)
         if (!tr) {
             tr = master_track;
         }
+        Track {tr};
 
         auto flags {0};
         auto track_automation_mode = GetTrackAutomationMode(tr);
@@ -221,13 +190,19 @@ static void initialize(vector<MediaTrack*>& v)
     return;
 }
 
-static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
+static bool process_fx(FXState& fxstate)
 {
     auto res = false;
     vector<GUID*> fx_to_enable {};
+    unordered_set<GUID*> tr_pdc_to_enable {};
+    auto& fx_to_disable = fxstate.to_disable;
+    auto& fx_disabled = fxstate.fx_disabled;
+    auto& fx_safe = fxstate.safe;
+    auto& tr_pdc_disabled = fxstate.tr_pdc_disabled;
+    auto& tr_pdc_to_disable = fxstate.tr_pdc_to_disable;
     fx_to_enable.reserve(fx_to_disable.size());
 
-    for (auto i = fx_disabled_g->cbegin(); i != fx_disabled_g->cend();) {
+    for (auto i = fx_disabled.cbegin(); i != fx_disabled.cend();) {
         auto v = find(fx_to_disable.cbegin(), fx_to_disable.cend(), *i);
         if (v != fx_to_disable.end()) {
             fx_to_disable.erase(v);
@@ -235,12 +210,27 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
         }
         else {
             fx_to_enable.push_back(*i);
-            i = fx_disabled_g->erase(i);
+            i = fx_disabled.erase(i);
         }
     }
 
-    if (!fx_to_enable.empty() || !fx_to_disable.empty()) {
-        auto preventCount = fx_to_disable.size() + fx_to_enable.size() + 4;
+    for (auto i = tr_pdc_disabled.cbegin(); i != tr_pdc_disabled.cend();) {
+        auto v = find(tr_pdc_to_disable.cbegin(), tr_pdc_to_disable.cend(), *i);
+        if (v != tr_pdc_to_disable.end()) {
+            tr_pdc_to_disable.erase(v);
+            ++i;
+        }
+        else {
+            tr_pdc_to_enable.insert(*i);
+            i = tr_pdc_disabled.erase(i);
+        }
+    }
+
+    if (!fx_to_enable.empty() || !fx_to_disable.empty() ||
+        !tr_pdc_to_enable.empty() || !tr_pdc_to_disable.empty()) {
+        auto preventCount = fx_to_disable.size() + fx_to_enable.size() +
+                            tr_pdc_to_enable.size() + tr_pdc_to_disable.size() +
+                            4;
 
         for (auto i = fx_safe.begin(); i != fx_safe.end();) {
             auto v = fx_map.find(*i);
@@ -263,11 +253,26 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
             }
         }
 
+        for (auto&& i : tr_pdc_to_enable) {
+            auto tr = track_map.at(i);
+            if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
+                TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "1");
+            }
+        }
+
         for (auto&& i : fx_to_disable) {
             auto fx = fx_map.at(i);
             if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                 TrackFX_SetEnabled(fx.tr, fx.idx, false);
-                fx_disabled_g->push_back(i);
+                fx_disabled.push_back(i);
+            }
+        }
+
+        for (auto&& i : tr_pdc_to_disable) {
+            auto tr = track_map.at(i);
+            if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
+                TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "2");
+                tr_pdc_disabled.insert(i);
             }
         }
 
@@ -284,9 +289,11 @@ static void get_set_state(FXState& r, bool is_set = false)
     constexpr char extName[] = "ak5k";
     constexpr char key[] = "ReaLlm";
     constexpr char keySafe[] = "ReaLlmSafe";
+    constexpr char keyTrPdc[] = "ReaLlmTrPdc";
 
     auto& fx_disabled = r.fx_disabled;
     auto& fx_safe = r.safe;
+    auto& tr_pdc_disabled = r.tr_pdc_disabled;
 
     if (is_set) {
         char buf[BUFSZGUID];
@@ -315,6 +322,18 @@ static void get_set_state(FXState& r, bool is_set = false)
             }
         }
         (void)SetProjExtState(0, extName, keySafe, s.c_str());
+
+        s.clear();
+        for (auto&& i : tr_pdc_disabled) {
+            if (ValidatePtr2(0, i, "GUID*")) {
+                guidToString(i, buf);
+                if (buf[0] != '\0') {
+                    s.append(buf);
+                    s.append(" ");
+                }
+            }
+        }
+        (void)SetProjExtState(0, extName, keyTrPdc, s.c_str());
     }
     else {
         string k {};
@@ -377,6 +396,31 @@ static void get_set_state(FXState& r, bool is_set = false)
                 }
             }
         }
+
+        (void)GetProjExtState(0, extName, keyTrPdc, p, (int)bufSz);
+        while (p && strlen(p) + 1 == bufSz) {
+            bufSz = bufSz * 2;
+            while (true) {
+                auto tmp = (char*)realloc(p, sizeof(char) * bufSz);
+                if (tmp) {
+                    p = tmp;
+                    break;
+                }
+            }
+            (void)GetProjExtState(0, extName, keyTrPdc, p, (int)bufSz);
+        }
+
+        if (p) {
+            k.clear();
+            ss.clear();
+            ss.str(p);
+            while (ss >> k) {
+                auto v = guid_string_map.find(k);
+                if (v != guid_string_map.end()) {
+                    tr_pdc_disabled.insert(v->second);
+                }
+            }
+        }
         free(p);
     }
     return;
@@ -407,118 +451,73 @@ static void Do2(int* param = 0)
 
 static void Do()
 {
-    while (true) {
-        if (pdc_mode_check) {
-            using namespace std::chrono_literals;
-            this_thread::sleep_for(30ms);
-        }
-        // auto time0 = time_precise();
-        auto project_state_change_count_now =
-            GetProjectStateChangeCount(0) + global_automation_override;
-        if (project_state_change_count_now != project_state_change_count ||
-            (llm_state == 0 && pdc_mode_check)) {
-            project_state_change_count = project_state_change_count_now;
-        }
-        else if (timer) {
-            return;
-        }
-        else if (pdc_mode_check) {
-            continue;
-        }
-        scoped_lock lk(m);
-        auto llm_state_current = llm_state.load();
+    // while (true) {
+    // auto time0 = time_precise();
+    auto project_state_change_count_now =
+        GetProjectStateChangeCount(0) + global_automation_override;
+    if (project_state_change_count_now != project_state_change_count) {
+        project_state_change_count = project_state_change_count_now;
+    }
+    else {
+        return;
+    }
+    scoped_lock lk(m);
+    auto llm_state_current = llm_state.load();
 
-        reaper_version = stod(GetAppVersion());
-        char buf[BUFSZSMALL];
-        if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
-            bsize = stoi(buf);
-            pdc_limit_abs = pdc_limit * bsize;
-        }
+    reaper_version = stod(GetAppVersion());
+    char buf[BUFSZSMALL];
+    if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
+        bsize = stoi(buf);
+        pdc_limit_abs = pdc_limit * bsize;
+    }
 
-        vector<MediaTrack*> input_tracks {};
+    vector<MediaTrack*> input_tracks {};
 
-        initialize(input_tracks);
+    initialize(input_tracks);
 
-        FXState fx_state {};
+    FXState fx_state {};
 
-        pdc_max = 0;
-        get_set_state(fx_state);
-        fx_disabled_g = &fx_state.fx_disabled;
+    pdc_max = 0;
+    get_set_state(fx_state);
 
-        if (llm_state_current == 0) {
-            input_tracks.clear();
-        }
+    if (llm_state_current == 0) {
+        input_tracks.clear();
+    }
 
-        // vector<future<FXState>> v {};
-        // if (pdc_mode_check) {
-        //     v.reserve(input_tracks.size());
-        // }
+    // vector<future<FXState>> v {};
 
-        for (auto&& i : input_tracks) {
-            // if (pdc_mode_check) {
-            //     v.emplace_back(async([tr = i, fx_safe = fx_state.safe]() {
-            //         FXState r;
-            //         r.safe = std::move(fx_safe);
-            //         Network<MediaTrack*, FXState, int> n {tr, r};
-            //         n.set_results(r);
-            //         n.traverse(true);
-            //         FXExt fx;
-            //         fx.fx_map_ext.clear();
-            //         fx.fx_map.clear();
-            //         Track tr_thread;
-            //         tr_thread.track_map.clear();
-            //         return n.get_results();
-            //     }));
-            // }
-            // else {
-            Network<MediaTrack*, FXState, int> n {i, fx_state};
-            n.traverse(true);
-            // }
-        }
+    for (auto&& i : input_tracks) {
+        Network<MediaTrack*, FXState, int> n {i, fx_state};
+        n.traverse(true);
+    }
 
-        // if (pdc_mode_check) {
-        //     for (auto&& i : v) {
-        //         auto results = i.get();
-        //         fx_state.to_disable.insert(
-        //             fx_state.to_disable.end(),
-        //             results.to_disable.begin(),
-        //             results.to_disable.end());
-        //         fx_state.safe.insert(
-        //             fx_state.safe.end(),
-        //             results.safe.begin(),
-        //             results.safe.end());
-        //         fx_state.unsafe.insert(
-        //             fx_state.unsafe.end(),
-        //             results.unsafe.begin(),
-        //             results.unsafe.end());
-        //     }
-        // }
+    fx_state.prepare();
 
-        fx_state.prepare();
+    if (process_fx(fx_state)) {
+        get_set_state(fx_state, true);
+    }
 
-        if (process_fx(fx_state.to_disable, fx_state.safe)) {
-            get_set_state(fx_state, true);
-        }
-
-        FXExt fx;
-        fx.fx_map_ext.clear();
-        Track tr_thread;
-        tr_thread.track_map.clear();
+    FXExt fx;
+    fx.fx_map_ext.clear();
+    Track tr_thread;
+    tr_thread.track_map.clear();
 
 #ifdef WIN32
-        // auto time1 = time_precise() - time0;
-        // #ifdef _DEBUG
-        // wdl_printf("%f%s", time1, "\n");
+    // auto time1 = time_precise() - time0;
+    // #ifdef _DEBUG
+    // wdl_printf("%f%s", time1, "\n");
 // #endif
 #endif
-        if (timer || llm_state_current == 0 || !pdc_mode_check) {
-            break;
-        }
-    }
+    // if (timer || llm_state_current == 0) {
+    //     break;
+    // }
+    //     break;
+    // }
 
     if (!timer) {
         FXExt fx;
         fx.fx_map.clear();
+        fx.track_map.clear();
         guid_string_map.clear();
     }
 
@@ -543,21 +542,13 @@ static bool CommandHook(
         llm_state = !llm_state;
         // static int param = llm_state;
         if (llm_state == 1) {
-            if (pdc_mode_check) {
-                // thread t(Do, &param);
-                // t.detach();
-            }
-            else {
-                plugin_register("timer", (void*)&Do);
-            }
+            plugin_register("timer", (void*)&Do);
         }
         else {
-            if (!pdc_mode_check) {
-                plugin_register("-timer", (void*)&Do);
-                timer = false;
-                Do(); // exitInOptional is true
-                guid_string_map.clear();
-            }
+            plugin_register("-timer", (void*)&Do);
+            timer = false;
+            Do(); // exitInOptional is true
+            guid_string_map.clear();
         }
         return true;
     }
@@ -606,9 +597,6 @@ const char* defstring_Get =
     "P_PDCLIMIT: "
     "Limit in samples."
     "\n" //
-    "P_PDCMODECHECK: "
-    "Is PDC mode check enabled? \"0\" or \"1\"."
-    "\n" //
     "P_REALLM or P_STATE: "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
@@ -640,8 +628,6 @@ static void Get(
 
     if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
         strcmp(parmname, "P_VECTOR") == 0) {
-        auto pdc_mode_check_temp = pdc_mode_check.load();
-        pdc_mode_check = false;
         initialize(input_tracks);
         if (ValidatePtr2(0, tr, "MediaTrack*")) {
             input_tracks.push_back(tr);
@@ -654,7 +640,6 @@ static void Get(
                 routes.push_back(i);
             }
         }
-        pdc_mode_check = pdc_mode_check_temp;
         for (auto&& i : routes) {
             for (auto&& j : i) {
                 auto trNum =
@@ -750,14 +735,6 @@ static void Get(
     else if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         s.append(to_string(pdc_limit));
     }
-    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
-        if (pdc_mode_check == true) {
-            s.append("1");
-        }
-        else {
-            s.append("0");
-        }
-    }
 
     auto n = (int)s.size();
     if (realloc_cmd_ptr(&buf, &bufSz, n)) {
@@ -783,9 +760,7 @@ const char* defstring_Set =
     "P_PDCLIMIT: "
     "PDC latency limit in audio blocks/buffers."
     "\n" //
-    "P_PDCMODECHECK: "
-    "Highly experimental. Check Track FX Chain PDC mode during Llm_Do(). \"0\" "
-    "or \"1\".";
+    ;
 
 void Set(const char* parmname, const char* buf)
 {
@@ -793,17 +768,6 @@ void Set(const char* parmname, const char* buf)
 
     if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         pdc_limit = stoi(buf);
-    }
-
-    else if (strcmp(parmname, "P_PDCMODECHECK") == 0) {
-        if (stoi(buf) == 0) {
-            pdc_mode_check = false;
-            plugin_register("-timer", (void*)&Do);
-        }
-        else if (stoi(buf) == 1) {
-            pdc_mode_check = true;
-            plugin_register("-timer", (void*)&Do);
-        }
     }
 
     return;
