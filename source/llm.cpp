@@ -10,7 +10,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 // isolate llm into its own safe space
 namespace llm {
@@ -245,13 +244,13 @@ static bool process_fx(vector<GUID*>& fx_to_disable, vector<GUID*>& fx_safe)
             }
         }
 
-        for (auto&& i : tracks_to_enable) {
-            TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "1");
-        }
+        // for (auto&& i : tracks_to_enable) {
+        //     TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "1");
+        // }
 
-        for (auto&& i : tracks_to_disable) {
-            TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "2");
-        }
+        // for (auto&& i : tracks_to_disable) {
+        //     TrackFX_SetNamedConfigParm(i.first, i.second, "pdc_mode", "2");
+        // }
 
         SetGlobalAutomationOverride(global_automation_override);
         Undo_EndBlock("ReaLlm: REAPER Low latency monitoring", UNDO_STATE_FX);

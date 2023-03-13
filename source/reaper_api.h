@@ -16,11 +16,9 @@
 #define REAPERAPI_WANT_GetTrackState
 #define REAPERAPI_WANT_GetTrackStateChunk
 #define REAPERAPI_WANT_PreventUIRefresh
-#define REAPERAPI_WANT_realloc_cmd_ptr
 #define REAPERAPI_WANT_SetGlobalAutomationOverride
 #define REAPERAPI_WANT_SetProjExtState
 #define REAPERAPI_WANT_ShowConsoleMsg
-#define REAPERAPI_WANT_stringToGuid
 #define REAPERAPI_WANT_TrackFX_GetCount
 #define REAPERAPI_WANT_TrackFX_GetEnabled
 #define REAPERAPI_WANT_TrackFX_GetFXGUID
@@ -28,9 +26,12 @@
 #define REAPERAPI_WANT_TrackFX_GetInstrument
 #define REAPERAPI_WANT_TrackFX_GetNamedConfigParm
 #define REAPERAPI_WANT_TrackFX_SetEnabled
+#define REAPERAPI_WANT_TrackFX_SetNamedConfigParm
 #define REAPERAPI_WANT_Undo_BeginBlock
 #define REAPERAPI_WANT_Undo_EndBlock
 #define REAPERAPI_WANT_ValidatePtr2
 #define REAPERAPI_WANT_guidToString
 #define REAPERAPI_WANT_plugin_register
+#define REAPERAPI_WANT_realloc_cmd_ptr
+#define REAPERAPI_WANT_stringToGuid
 #define REAPERAPI_WANT_time_precise
