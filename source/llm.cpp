@@ -23,8 +23,8 @@ static double reaper_version {};
 static int bsize {};
 static int command_id {};
 static int global_automation_override {};
-static int pdc_limit_abs {};
-static int pdc_limit {1};
+static double pdc_limit_abs {};
+static double pdc_limit {1};
 static int pdc_max {};
 static int project_state_change_count {0};
 
@@ -500,8 +500,8 @@ static void Do()
 
     FXExt fx;
     fx.fx_map_ext.clear();
-    Track tr_thread;
-    tr_thread.track_map.clear();
+    Track tracks;
+    tracks.track_map.clear();
 
 #ifdef WIN32
     // auto time1 = time_precise() - time0;
@@ -515,7 +515,7 @@ static void Do()
     //     break;
     // }
 
-    if (!timer) {
+    if (!timer && llm_state_current == 0) {
         FXExt fx;
         fx.fx_map.clear();
         fx.track_map.clear();
@@ -768,7 +768,7 @@ void Set(const char* parmname, const char* buf)
     scoped_lock lk(m);
 
     if (strcmp(parmname, "P_PDCLIMIT") == 0) {
-        pdc_limit = stoi(buf);
+        pdc_limit = stod(buf);
     }
 
     return;
