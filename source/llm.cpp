@@ -776,10 +776,6 @@ void Set(const char* parmname, const char* buf)
 void Register(bool load)
 {
     reaper_version = stod(GetAppVersion());
-    if (reaper_version < 6.72) {
-        ShowConsoleMsg("ReaLlm requires REAPER 6.72 or later.");
-        return;
-    }
     custom_action_register_t action {
         0,
         "AK5K_REALLM",
@@ -787,6 +783,10 @@ void Register(bool load)
         nullptr};
 
     if (load) {
+        if (reaper_version < 6.72) {
+            ShowConsoleMsg("ReaLlm requires REAPER 6.72 or later.");
+            return;
+        }
         command_id = plugin_register("custom_action", &action);
         plugin_register("hookcommand2", (void*)&CommandHook);
         plugin_register("toggleaction", (void*)&ToggleActionCallback);
