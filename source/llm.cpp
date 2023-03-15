@@ -97,8 +97,6 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     // (void)Track(tr);
     tr_pdc_to_disable.insert(GetTrackGUID(tr));
 
-    auto instrument = TrackFX_GetInstrument(tr);
-
     for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
         auto guid = TrackFX_GetFXGUID(tr, i);
         auto& fx = fx_map_ext[guid];
@@ -116,7 +114,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         }
 
         auto safe = false;
-        if ((is_enabled && was_disabled) || i == instrument) {
+        if ((is_enabled && was_disabled)) {
             fx_safe.push_back(guid);
             safe = true;
         }
@@ -139,7 +137,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
 
         if (pdc > 0) {
             pdc_temp = pdc_temp + pdc;
-            if (!safe && pdc_current + pdc_temp > pdc_limit_abs) {
+            if (!fx.inst && !safe && pdc_current + pdc_temp > pdc_limit_abs) {
                 pdc_temp = pdc_temp - pdc;
                 auto k =
                     find(fx_to_disable.cbegin(), fx_to_disable.cend(), guid);
@@ -453,6 +451,7 @@ static void Do()
 {
     // while (true) {
     // auto time0 = time_precise();
+    scoped_lock lk(m);
     auto llm_state_current = llm_state.load();
     auto project_state_change_count_now =
         GetProjectStateChangeCount(0) + global_automation_override;
@@ -463,7 +462,6 @@ static void Do()
     else {
         return;
     }
-    scoped_lock lk(m);
 
     reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
@@ -500,8 +498,7 @@ static void Do()
 
     FXExt fx;
     fx.fx_map_ext.clear();
-    Track tracks;
-    tracks.track_map.clear();
+    fx.fx_map.clear();
 
 #ifdef WIN32
     // auto time1 = time_precise() - time0;
@@ -516,8 +513,6 @@ static void Do()
     // }
 
     if (!timer && llm_state_current == 0) {
-        FXExt fx;
-        fx.fx_map.clear();
         fx.track_map.clear();
         guid_string_map.clear();
     }

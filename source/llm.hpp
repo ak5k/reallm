@@ -150,11 +150,13 @@ class FXExt : public FX {
     bool enabled;
     char name[BUFSZGUID] = {0};
     int pdc;
+    bool inst;
     FXExt()
         : FX {}
         , enabled {}
         , name {}
         , pdc {}
+        , inst {false}
     {
     }
     FXExt(MediaTrack* tr, int fx_idx)
@@ -162,6 +164,7 @@ class FXExt : public FX {
         , enabled {TrackFX_GetEnabled(tr, fx_idx)}
         , name {}
         , pdc {}
+        , inst {false}
     {
         TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
         TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
@@ -172,6 +175,11 @@ class FXExt : public FX {
         if (strstr(name, "ReaInsert")) {
             pdc = BUFSZNEEDBIG;
         }
+        TrackFX_GetNamedConfigParm(tr, idx, "fx_type", buf, BUFSZSMALL);
+        if (buf[strlen(buf) - 1] == 'i') {
+            inst = true;
+        }
+
         fx_map_ext[g] = std::move(*this);
     }
 
