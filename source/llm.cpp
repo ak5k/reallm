@@ -259,32 +259,40 @@ static bool process_fx(FXState& fxstate)
         SetGlobalAutomationOverride(6);
 
         for (auto&& i : fx_to_enable) {
-            auto fx = fx_map.at(i);
-            if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
-                TrackFX_SetEnabled(fx.tr, fx.idx, true);
+            if (fx_map.find(i) != fx_map.end()) {
+                auto fx = fx_map.at(i);
+                if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
+                    TrackFX_SetEnabled(fx.tr, fx.idx, true);
+                }
             }
         }
 
         for (auto&& i : tr_pdc_to_enable) {
-            auto tr = track_map.at(i);
-            if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
-                TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "1");
+            if (track_map.find(i) != track_map.end()) {
+                auto tr = track_map.at(i);
+                if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
+                    TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "1");
+                }
             }
         }
 
         for (auto&& i : fx_to_disable) {
-            auto fx = fx_map.at(i);
-            if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
-                TrackFX_SetEnabled(fx.tr, fx.idx, false);
-                fx_disabled.push_back(i);
+            if (fx_map.find(i) != fx_map.end()) {
+                auto fx = fx_map.at(i);
+                if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
+                    TrackFX_SetEnabled(fx.tr, fx.idx, false);
+                    fx_disabled.push_back(i);
+                }
             }
         }
 
         for (auto&& i : tr_pdc_to_disable) {
-            auto tr = track_map.at(i);
-            if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
-                TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "2");
-                tr_pdc_disabled.insert(i);
+            if (track_map.find(i) != track_map.end()) {
+                auto tr = track_map.at(i);
+                if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
+                    TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "2");
+                    tr_pdc_disabled.insert(i);
+                }
             }
         }
 
@@ -443,7 +451,8 @@ const char* defstring_Do =
     "Called with parameter value 1 executes one ReaLlm cycle. "
     "E.g. for running ReaLlm on custom timer, or deferred. "
     "0 or nothing performs shutdown. "
-    "Disarming/disabling all monitored inputs and calling with parameter value "
+    "Disarming/disabling all monitored inputs and calling with parameter "
+    "value "
     "1 equals to shutdown.";
 
 bool timer {false};
@@ -512,6 +521,7 @@ static void Do()
 
     FXExt fx;
     fx.fx_map_ext.clear();
+    fx.fx_map.clear();
     fx.track_map.clear();
 
 #ifdef WIN32
@@ -527,7 +537,6 @@ static void Do()
     // }
 
     if (!timer && llm_state_current == 0) {
-        fx.fx_map.clear();
         guid_string_map.clear();
     }
 
