@@ -29,6 +29,7 @@
 #define REAPERAPI_WANT_TrackFX_GetRecCount
 #define REAPERAPI_WANT_TrackFX_SetEnabled
 #define REAPERAPI_WANT_TrackFX_SetNamedConfigParm
+#define REAPERAPI_WANT_TrackFX_SetParam
 #define REAPERAPI_WANT_Undo_BeginBlock
 #define REAPERAPI_WANT_Undo_EndBlock
 #define REAPERAPI_WANT_ValidatePtr2

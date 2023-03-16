@@ -31,7 +31,7 @@ static int pdc_max {};
 static int project_state_change_count {0};
 
 unordered_map<string, GUID*> guid_string_map {};
-// unordered_map<string, unordered_map<string, string>> param_change {};
+unordered_map<string, unordered_map<int, pair<double, double>>> param_change {};
 
 // master lock for thread safety
 static mutex m {};
@@ -128,6 +128,10 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
         }
         else if (
             find(fx_safe.cbegin(), fx_safe.cend(), guid) != fx_safe.cend()) {
+            safe = true;
+        }
+
+        if (param_change.contains(fx.name)) {
             safe = true;
         }
 
@@ -272,6 +276,35 @@ static bool process_fx(FXState& fxstate)
                 auto tr = track_map.at(i);
                 if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
                     TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "1");
+                    if (!param_change.empty()) {
+                        auto fx_count = TrackFX_GetCount(tr.tr);
+                        if (tr.tr == master_track && include_monitoring_fx) {
+                            fx_count = fx_count + TrackFX_GetRecCount(tr.tr);
+                        }
+
+                        for (auto i = 0; i < fx_count; i++) {
+                            auto idx = i;
+                            if (tr.tr == master_track &&
+                                include_monitoring_fx &&
+                                idx >= TrackFX_GetCount(tr.tr)) {
+                                idx = idx - TrackFX_GetCount(tr.tr) + 0x1000000;
+                            }
+                            auto guid = TrackFX_GetFXGUID(tr.tr, idx);
+                            auto& fx = fx_map_ext[guid];
+                            if (fx.tr_idx() == INT_MAX) {
+                                fx = FXExt {tr.tr, idx};
+                            }
+                            if (param_change.contains(fx.name)) {
+                                for (auto&& i : param_change[fx.name]) {
+                                    TrackFX_SetParam(
+                                        fx.tr,
+                                        fx.idx,
+                                        i.first,
+                                        i.second.second);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -292,6 +325,35 @@ static bool process_fx(FXState& fxstate)
                 if (ValidatePtr2(0, tr.tr, "MediaTrack*")) {
                     TrackFX_SetNamedConfigParm(tr.tr, 0, "chain_pdc_mode", "2");
                     tr_pdc_disabled.insert(i);
+                    if (!param_change.empty()) {
+                        auto fx_count = TrackFX_GetCount(tr.tr);
+                        if (tr.tr == master_track && include_monitoring_fx) {
+                            fx_count = fx_count + TrackFX_GetRecCount(tr.tr);
+                        }
+
+                        for (auto i = 0; i < fx_count; i++) {
+                            auto idx = i;
+                            if (tr.tr == master_track &&
+                                include_monitoring_fx &&
+                                idx >= TrackFX_GetCount(tr.tr)) {
+                                idx = idx - TrackFX_GetCount(tr.tr) + 0x1000000;
+                            }
+                            auto guid = TrackFX_GetFXGUID(tr.tr, idx);
+                            auto& fx = fx_map_ext[guid];
+                            if (fx.tr_idx() == INT_MAX) {
+                                fx = FXExt {tr.tr, idx};
+                            }
+                            if (param_change.contains(fx.name)) {
+                                for (auto&& i : param_change[fx.name]) {
+                                    TrackFX_SetParam(
+                                        fx.tr,
+                                        fx.idx,
+                                        i.first,
+                                        i.second.first);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -780,7 +842,7 @@ const char* defstring_Set =
     "PDC latency limit in audio blocks/buffers."
     "\n" //
     "P_MONITORINGFX: "
-    "Include Monitoring FX."
+    "Use any string to include Monitoring FX. Empty string to exclude."
     "\n" //
     ;
 
@@ -799,6 +861,27 @@ void Set(const char* parmname, const char* buf)
         else {
             include_monitoring_fx = false;
         }
+    }
+
+    if (strcmp(parmname, "P_PARAMCHANGE") == 0) {
+        std::string s {buf};
+        std::string delimiter = ";";
+
+        size_t pos = 0;
+        pos = s.find(delimiter);
+        string name = s.substr(0, pos);
+        s.erase(0, pos + delimiter.length());
+        pos = s.find(delimiter);
+        auto param = stoi(s.substr(0, pos));
+        s.erase(0, pos + delimiter.length());
+        pos = s.find(delimiter);
+        auto val1 = stod(s.substr(0, pos));
+        s.erase(0, pos + delimiter.length());
+        pos = s.find(delimiter);
+        auto val2 = stod(s.substr(0, pos));
+        s.erase(0, pos + delimiter.length());
+        param_change[name][param].first = val1;
+        param_change[name][param].second = val2;
     }
 
     return;
