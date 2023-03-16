@@ -63,7 +63,7 @@ for:
         only:
           [
             appveyor_build_worker_image: macos,
-            appveyor_build_worker_image: macos-mojave,
+            appveyor_build_worker_image: macos-bigsur,
           ],
       }
     cache:
@@ -74,8 +74,8 @@ for:
 
       - |-
         case $ARCH in
-        *arm64*) export DEPLOY_TARGET=11.0 XCODE_VERSION=12.3  ;;
-        *)     export DEPLOY_TARGET=10.9 XCODE_VERSION=12.4 ;;
+        *arm64*) export DEPLOY_TARGET=11.0 XCODE_VERSION=12.5.1  ;;
+        *)     export DEPLOY_TARGET=10.9 XCODE_VERSION=12.5.1 ;;
         esac
       - sudo xcode-select -s /Applications/Xcode-$XCODE_VERSION.app
       # https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
@@ -103,16 +103,16 @@ for:
 environment:
   matrix:
     - job_name: macOS x86 32-bit
-      appveyor_build_worker_image: macos
+      appveyor_build_worker_image: macos-bigsur
       ARCH: i386
     - job_name: macOS ARM 64-bit
-      appveyor_build_worker_image: macos
+      appveyor_build_worker_image: macos-bigsur
       ARCH: arm64 #;x86_64
     - job_name: Linux x86 64-bit
       appveyor_build_worker_image: *linux
       ARCH: x86_64
     - job_name: macOS x86 64-bit
-      appveyor_build_worker_image: macos
+      appveyor_build_worker_image: macos-bigsur
       ARCH: x86_64
     - job_name: Windows 64-bit
       appveyor_build_worker_image: *windows
