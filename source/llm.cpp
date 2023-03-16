@@ -18,19 +18,20 @@ namespace llm {
 using namespace std;
 
 // globals
+static MediaTrack* master_track {};
 static atomic<int> llm_state {};
+static bool include_monitoring_fx {true};
+static double pdc_limit {1};
+static double pdc_limit_abs {};
 static double reaper_version {};
 static int bsize {};
 static int command_id {};
 static int global_automation_override {};
-static double pdc_limit_abs {};
-static double pdc_limit {1};
 static int pdc_max {};
 static int project_state_change_count {0};
 
-static MediaTrack* master_track {};
-
 unordered_map<string, GUID*> guid_string_map {};
+// unordered_map<string, unordered_map<string, string>> param_change {};
 
 // master lock for thread safety
 static mutex m {};
@@ -87,21 +88,28 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     auto& fx_unsafe = r.unsafe;
     auto& pdc_current = v;
     auto& tr_pdc_to_disable = r.tr_pdc_to_disable;
-    // auto& track_map = Track().track_map;
     auto pdc_temp {0};
 
     if (!ValidatePtr2(0, tr, "MediaTrack*")) {
         return v;
     }
 
-    // (void)Track(tr);
     tr_pdc_to_disable.insert(GetTrackGUID(tr));
+    auto fx_count = TrackFX_GetCount(tr);
+    if (tr == master_track && include_monitoring_fx) {
+        fx_count = fx_count + TrackFX_GetRecCount(tr);
+    }
 
-    for (auto i = 0; i < TrackFX_GetCount(tr); i++) {
-        auto guid = TrackFX_GetFXGUID(tr, i);
+    for (auto i = 0; i < fx_count; i++) {
+        auto idx = i;
+        if (tr == master_track && include_monitoring_fx &&
+            idx >= TrackFX_GetCount(tr)) {
+            idx = idx - TrackFX_GetCount(tr) + 0x1000000;
+        }
+        auto guid = TrackFX_GetFXGUID(tr, idx);
         auto& fx = fx_map_ext[guid];
         if (fx.tr_idx() == INT_MAX) {
-            fx = FXExt {tr, i};
+            fx = FXExt {tr, idx};
         }
         auto& pdc = fx.pdc;
 
@@ -183,6 +191,12 @@ static void initialize(vector<MediaTrack*>& v)
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
             FX {tr, j};
+        }
+    }
+    if (include_monitoring_fx) {
+        for (auto i = 0; i < TrackFX_GetRecCount(master_track); i++) {
+            auto j = 0x1000000 + i;
+            FX {master_track, j};
         }
     }
     return;
@@ -498,7 +512,6 @@ static void Do()
 
     FXExt fx;
     fx.fx_map_ext.clear();
-    fx.fx_map.clear();
 
 #ifdef WIN32
     // auto time1 = time_precise() - time0;
@@ -514,6 +527,7 @@ static void Do()
 
     if (!timer && llm_state_current == 0) {
         fx.track_map.clear();
+        fx.fx_map.clear();
         guid_string_map.clear();
     }
 
@@ -756,6 +770,9 @@ const char* defstring_Set =
     "P_PDCLIMIT: "
     "PDC latency limit in audio blocks/buffers."
     "\n" //
+    "P_MONITORINGFX: "
+    "Include Monitoring FX."
+    "\n" //
     ;
 
 void Set(const char* parmname, const char* buf)
@@ -764,6 +781,15 @@ void Set(const char* parmname, const char* buf)
 
     if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         pdc_limit = stod(buf);
+    }
+
+    if (strcmp(parmname, "P_MONITORINGFX") == 0) {
+        if (strlen(buf) > 0) {
+            include_monitoring_fx = true;
+        }
+        else {
+            include_monitoring_fx = false;
+        }
     }
 
     return;
