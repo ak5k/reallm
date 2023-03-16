@@ -105,7 +105,7 @@ for:
 environment:
   matrix:
     - job_name: macOS x86 32-bit
-      appveyor_build_worker_image: macos-catalina
+      appveyor_build_worker_image: macos-mojave
       ARCH: i386
     - job_name: macOS ARM 64-bit
       appveyor_build_worker_image: macos-catalina
@@ -114,7 +114,7 @@ environment:
       appveyor_build_worker_image: *linux
       ARCH: x86_64
     - job_name: macOS x86 64-bit
-      appveyor_build_worker_image: macos-catalina
+      appveyor_build_worker_image: macos-mojave
       ARCH: x86_64
     - job_name: Windows 64-bit
       appveyor_build_worker_image: *windows
