@@ -131,7 +131,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
             safe = true;
         }
 
-        if (param_change.contains(fx.name)) {
+        if (param_change.find(fx.name) != param_change.end()) {
             safe = true;
         }
 
@@ -294,7 +294,8 @@ static bool process_fx(FXState& fxstate)
                             if (fx.tr_idx() == INT_MAX) {
                                 fx = FXExt {tr.tr, idx};
                             }
-                            if (param_change.contains(fx.name)) {
+                            if (param_change.find(fx.name) !=
+                                param_change.end()) {
                                 for (auto&& i : param_change[fx.name]) {
                                     TrackFX_SetParam(
                                         fx.tr,
@@ -343,7 +344,8 @@ static bool process_fx(FXState& fxstate)
                             if (fx.tr_idx() == INT_MAX) {
                                 fx = FXExt {tr.tr, idx};
                             }
-                            if (param_change.contains(fx.name)) {
+                            if (param_change.find(fx.name) !=
+                                param_change.end()) {
                                 for (auto&& i : param_change[fx.name]) {
                                     TrackFX_SetParam(
                                         fx.tr,
