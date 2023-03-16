@@ -512,6 +512,7 @@ static void Do()
 
     FXExt fx;
     fx.fx_map_ext.clear();
+    fx.track_map.clear();
 
 #ifdef WIN32
     // auto time1 = time_precise() - time0;
@@ -526,7 +527,6 @@ static void Do()
     // }
 
     if (!timer && llm_state_current == 0) {
-        fx.track_map.clear();
         fx.fx_map.clear();
         guid_string_map.clear();
     }
