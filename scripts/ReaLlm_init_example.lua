@@ -4,16 +4,16 @@ if reallmID == 0 then return end
 state = reaper.GetToggleCommandState(reallmID)
 
 -- set PDC latency limit 0.9 times current audio device buffer size
-reaper.Llm_Set("P_PDCLIMIT", "0.9")
+reaper.Llm_Set("D_PDCLIMIT", "0.9")
 
 -- also handle monitoring fx
-reaper.Llm_Set("P_MONITORINGFX", "yes")
+reaper.Llm_Set("B_MONITORINGFX", "true")
 
 --[[ 
 Changes 'VST3: Pro-C 2 (FabFilter)' plugin parameter index 8 (Lookahead) on/off
 when instances are found in monitored signalchain.
 ]] --
-reaper.Llm_Set("P_PARAMCHANGE", "VST3: Pro-C 2 (FabFilter),8,0,1")
+reaper.Llm_Set("C_PARAMCHANGE", "VST3: Pro-C 2 (FabFilter),8,0,1")
 
 -- enable / disable ReaLlm
 reaper.Main_OnCommand(reallmID, 0)

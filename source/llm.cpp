@@ -662,7 +662,7 @@ const char* defstring_Get =
     "Tracks are separated with ';'. "
     "FX are listed after ':' separated with ','. "
     "\n" //
-    "P_GRAPH: "
+    "C_GRAPH: "
     "Mixer routings as network graph in format "
     "\"node;neighborhood\\n\" "
     "where node is track, and neighborhood is group of tracks in format "
@@ -674,13 +674,13 @@ const char* defstring_Get =
     "E.g. \"7;1;-1;\\n\" would mean "
     "\"8th track is connected to 2nd track and Master track.\""
     "\n" //
-    "P_PDCLATENCY: "
+    "I_PDCLATENCY: "
     "Latency in samples."
     "\n" //
-    "P_PDCLIMIT: "
+    "F_PDCLIMIT: "
     "Limit in samples."
     "\n" //
-    "P_REALLM or P_STATE: "
+    "C_REALLM or C_STATE: "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
     "\"begin:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
@@ -688,10 +688,10 @@ const char* defstring_Get =
     "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
     "Master track, fx#1 disabled."
     "\n" //
-    "P_SAFE: "
+    "C_SAFE: "
     "'Safed' plugins as \"track#:fx#\\n\" pairs."
     "\n" //
-    "P_VECTOR: Same as P_REALLM without FX information. Faster.";
+    "C_VECTOR: Same as P_REALLM without FX information. Faster.";
 
 static void Get(
     const char* parmname,
@@ -812,18 +812,18 @@ static void Get(
         }
     }
 
-    else if (strcmp(parmname, "P_PDCLATENCY") == 0) {
+    else if (strcmp(parmname, "I_PDCLATENCY") == 0) {
         s.append(to_string((int)(pdc_max + 0.5)));
     }
-    else if (strcmp(parmname, "P_PDCLIMIT") == 0) {
+    else if (strcmp(parmname, "F_PDCLIMIT") == 0) {
         s.append(to_string(pdc_limit));
     }
-    else if (strcmp(parmname, "P_MONITORINGFX") == 0) {
+    else if (strcmp(parmname, "B_MONITORINGFX") == 0) {
         if (include_monitoring_fx) {
             s.append("yes");
         }
     }
-    else if (strcmp(parmname, "P_PARAMCHANGE") == 0) {
+    else if (strcmp(parmname, "C_PARAMCHANGE") == 0) {
         for (auto&& i : param_change) {
             for (auto&& j : i.second) {
                 if (!s.empty()) {
@@ -857,14 +857,14 @@ const char* defstring_Set =
     "bufIn\0"
     "Set ReaLlm parameters."
     "\n" //
-    "P_PDCLIMIT: "
+    "F_PDCLIMIT: "
     "PDC latency limit in audio blocks/buffers."
     "\n" //
-    "P_MONITORINGFX: "
+    "B_MONITORINGFX: "
     "Use any non-empty string to include Monitoring FX. Empty string to "
     "exclude."
     "\n" //
-    "P_PARAMCHANGE: "
+    "C_PARAMCHANGE: "
     "Changes FX parameter of plugin between val1 (low latency) and "
     "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
     "\n" //
@@ -874,11 +874,11 @@ void Set(const char* parmname, const char* buf)
 {
     scoped_lock lk(m);
 
-    if (strcmp(parmname, "P_PDCLIMIT") == 0) {
+    if (strcmp(parmname, "F_PDCLIMIT") == 0) {
         pdc_limit = stod(buf);
     }
 
-    if (strcmp(parmname, "P_MONITORINGFX") == 0) {
+    if (strcmp(parmname, "B_MONITORINGFX") == 0) {
         if (strlen(buf) > 0) {
             include_monitoring_fx = true;
         }
@@ -887,7 +887,7 @@ void Set(const char* parmname, const char* buf)
         }
     }
 
-    if (strcmp(parmname, "P_PARAMCHANGE") == 0) {
+    if (strcmp(parmname, "C_PARAMCHANGE") == 0) {
         std::string s {buf};
         std::string delimiter = ",";
 
