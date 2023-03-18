@@ -13,7 +13,7 @@ reaper.Llm_Set("P_MONITORINGFX", "yes")
 Changes 'VST3: Pro-C 2 (FabFilter)' plugin parameter index 8 (Lookahead) on/off
 when instances are found in monitored signalchain.
 ]] --
-reaper.Llm_set("P_PARAMCHANGE", "VST3: Pro-C 2 (FabFilter),8,0,1")
+reaper.Llm_Set("P_PARAMCHANGE", "VST3: Pro-C 2 (FabFilter),8,0,1")
 
 -- enable / disable ReaLlm
 reaper.Main_OnCommand(reallmID, 0)
