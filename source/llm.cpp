@@ -662,7 +662,7 @@ const char* defstring_Get =
     "Tracks are separated with ';'. "
     "FX are listed after ':' separated with ','. "
     "\n" //
-    "C_GRAPH: "
+    "GRAPH: "
     "Mixer routings as network graph in format "
     "\"node;neighborhood\\n\" "
     "where node is track, and neighborhood is group of tracks in format "
@@ -674,13 +674,13 @@ const char* defstring_Get =
     "E.g. \"7;1;-1;\\n\" would mean "
     "\"8th track is connected to 2nd track and Master track.\""
     "\n" //
-    "I_PDCLATENCY: "
+    "PDCLATENCY: "
     "Latency in samples."
     "\n" //
-    "F_PDCLIMIT: "
+    "PDCLIMIT: "
     "Limit in samples."
     "\n" //
-    "C_REALLM or C_STATE: "
+    "REALLM or STATE: "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
     "\"begin:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
@@ -688,10 +688,10 @@ const char* defstring_Get =
     "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
     "Master track, fx#1 disabled."
     "\n" //
-    "C_SAFE: "
+    "SAFE: "
     "'Safed' plugins as \"track#:fx#\\n\" pairs."
     "\n" //
-    "C_VECTOR: Same as P_REALLM without FX information. Faster.";
+    "VECTOR: Same as REALLM without FX information. Faster.";
 
 static void Get(
     const char* parmname,
@@ -709,8 +709,8 @@ static void Get(
     auto& fx_disabled = fx_state.fx_disabled;
     auto& fx_safe = fx_state.safe;
 
-    if (strcmp(parmname, "P_REALLM") == 0 || strcmp(parmname, "P_STATE") == 0 ||
-        strcmp(parmname, "P_VECTOR") == 0) {
+    if (strcmp(parmname, "REALLM") == 0 || strcmp(parmname, "STATE") == 0 ||
+        strcmp(parmname, "VECTOR") == 0) {
         initialize(input_tracks);
         if (ValidatePtr2(0, tr, "MediaTrack*")) {
             input_tracks.push_back(tr);
@@ -731,7 +731,7 @@ static void Get(
                     trNum = -1;
                 }
                 s.append(to_string(trNum));
-                if (strcmp(parmname, "P_VECTOR") != 0) {
+                if (strcmp(parmname, "VECTOR") != 0) {
                     for (auto k = 0; k < TrackFX_GetCount(j); k++) {
                         if (k == 0) {
                             s.append(":");
@@ -759,7 +759,7 @@ static void Get(
         }
     }
 
-    else if (strcmp(parmname, "P_GRAPH") == 0) {
+    else if (strcmp(parmname, "GRAPH") == 0) {
         unordered_map<MediaTrack*, vector<MediaTrack*>> network;
         for (auto i = 0; i < GetNumTracks(); i++) {
             Network<MediaTrack*, FXState, int> n {GetTrack(0, i), fx_state};
@@ -793,7 +793,7 @@ static void Get(
         }
     }
 
-    else if (strcmp(parmname, "P_SAFE") == 0) {
+    else if (strcmp(parmname, "SAFE") == 0) {
         initialize(input_tracks);
         for (auto i = fx_safe.begin(); i != fx_safe.end();) {
             auto v = fx_map.find(*i);
@@ -812,18 +812,18 @@ static void Get(
         }
     }
 
-    else if (strcmp(parmname, "I_PDCLATENCY") == 0) {
+    else if (strcmp(parmname, "PDCLATENCY") == 0) {
         s.append(to_string((int)(pdc_max + 0.5)));
     }
-    else if (strcmp(parmname, "F_PDCLIMIT") == 0) {
+    else if (strcmp(parmname, "PDCLIMIT") == 0) {
         s.append(to_string(pdc_limit));
     }
-    else if (strcmp(parmname, "B_MONITORINGFX") == 0) {
+    else if (strcmp(parmname, "MONITORINGFX") == 0) {
         if (include_monitoring_fx) {
             s.append("yes");
         }
     }
-    else if (strcmp(parmname, "C_PARAMCHANGE") == 0) {
+    else if (strcmp(parmname, "PARAMCHANGE") == 0) {
         for (auto&& i : param_change) {
             for (auto&& j : i.second) {
                 if (!s.empty()) {
@@ -857,14 +857,13 @@ const char* defstring_Set =
     "bufIn\0"
     "Set ReaLlm parameters."
     "\n" //
-    "F_PDCLIMIT: "
-    "PDC latency limit in audio blocks/buffers."
+    "PDCLIMIT: "
+    "PDC latency limit in audio blocks/buffers, e.g. \"1.5\"."
     "\n" //
-    "B_MONITORINGFX: "
-    "Use any non-empty string to include Monitoring FX. Empty string to "
-    "exclude."
+    "MONITORINGFX: "
+    "Use any non-empty string to include Monitoring FX. E.g. \"true\"."
     "\n" //
-    "C_PARAMCHANGE: "
+    "PARAMCHANGE: "
     "Changes FX parameter of plugin between val1 (low latency) and "
     "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
     "\n" //
@@ -874,11 +873,11 @@ void Set(const char* parmname, const char* buf)
 {
     scoped_lock lk(m);
 
-    if (strcmp(parmname, "F_PDCLIMIT") == 0) {
+    if (strcmp(parmname, "PDCLIMIT") == 0) {
         pdc_limit = stod(buf);
     }
 
-    if (strcmp(parmname, "B_MONITORINGFX") == 0) {
+    if (strcmp(parmname, "MONITORINGFX") == 0) {
         if (strlen(buf) > 0) {
             include_monitoring_fx = true;
         }
@@ -887,7 +886,7 @@ void Set(const char* parmname, const char* buf)
         }
     }
 
-    if (strcmp(parmname, "C_PARAMCHANGE") == 0) {
+    if (strcmp(parmname, "PARAMCHANGE") == 0) {
         std::string s {buf};
         std::string delimiter = ",";
 
