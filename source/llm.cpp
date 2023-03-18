@@ -818,6 +818,23 @@ static void Get(
     else if (strcmp(parmname, "P_PDCLIMIT") == 0) {
         s.append(to_string(pdc_limit));
     }
+    else if (strcmp(parmname, "P_MONITORINGFX") == 0) {
+        if (include_monitoring_fx) {
+            s.append("yes");
+        }
+    }
+    else if (strcmp(parmname, "P_PARAMCHANGE") == 0) {
+        for (auto&& i : param_change) {
+            for (auto&& j : i.second) {
+                if (!s.empty()) {
+                    s += ";";
+                }
+                s += i.first + "," + to_string(j.first) + "," +
+                     to_string(j.second.first) + "," +
+                     to_string(j.second.second);
+            }
+        }
+    }
 
     auto n = (int)s.size();
     if (realloc_cmd_ptr(&buf, &bufSz, n)) {
@@ -844,7 +861,12 @@ const char* defstring_Set =
     "PDC latency limit in audio blocks/buffers."
     "\n" //
     "P_MONITORINGFX: "
-    "Use any string to include Monitoring FX. Empty string to exclude."
+    "Use any non-empty string to include Monitoring FX. Empty string to "
+    "exclude."
+    "\n" //
+    "P_PARAMCHANGE: "
+    "Changes FX parameter of plugin between val1 (low latency) and "
+    "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
     "\n" //
     ;
 
@@ -867,7 +889,7 @@ void Set(const char* parmname, const char* buf)
 
     if (strcmp(parmname, "P_PARAMCHANGE") == 0) {
         std::string s {buf};
-        std::string delimiter = ";";
+        std::string delimiter = ",";
 
         size_t pos = 0;
         pos = s.find(delimiter);
