@@ -662,7 +662,7 @@ const char* defstring_Get =
     "Tracks are separated with ';'. "
     "FX are listed after ':' separated with ','. "
     "\n" //
-    "GRAPH: "
+    "GRAPH : "
     "Mixer routings as network graph in format "
     "\"node;neighborhood\\n\" "
     "where node is track, and neighborhood is group of tracks in format "
@@ -674,13 +674,13 @@ const char* defstring_Get =
     "E.g. \"7;1;-1;\\n\" would mean "
     "\"8th track is connected to 2nd track and Master track.\""
     "\n" //
-    "PDCLATENCY: "
+    "PDCLATENCY : "
     "Latency in samples."
     "\n" //
-    "PDCLIMIT: "
+    "PDCLIMIT : "
     "Limit in samples."
     "\n" //
-    "REALLM or STATE: "
+    "REALLM or STATE : "
     "Current state of ReaLlm as approach vektors with disabled FX in "
     "format: "
     "\"begin:disabled fx,...;next:fx,...;end:fx,...;\\n.\" "
@@ -688,10 +688,10 @@ const char* defstring_Get =
     "4th track, fx#2 and #3 disabled => 1st track, nofx disabled => "
     "Master track, fx#1 disabled."
     "\n" //
-    "SAFE: "
+    "SAFE : "
     "'Safed' plugins as \"track#:fx#\\n\" pairs."
     "\n" //
-    "VECTOR: Same as REALLM without FX information. Faster.";
+    "VECTOR : Same as REALLM without FX information. Faster.";
 
 static void Get(
     const char* parmname,
@@ -857,14 +857,14 @@ const char* defstring_Set =
     "bufIn\0"
     "Set ReaLlm parameters."
     "\n" //
-    "PDCLIMIT: "
+    "PDCLIMIT : "
     "PDC latency limit in audio blocks/buffers, e.g. \"1.5\"."
     "\n" //
-    "MONITORINGFX: "
+    "MONITORINGFX : "
     "Use any non-empty string to include Monitoring FX. E.g. \"true\"."
     "\n" //
-    "PARAMCHANGE: "
-    "Changes FX parameter of plugin between val1 (low latency) and "
+    "PARAMCHANGE : "
+    "Instead of bypassing, changes FX parameter between val1 (low latency) and "
     "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
     "\n" //
     ;
