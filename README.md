@@ -18,7 +18,7 @@ API documentation available in REAPER Help > ReaScript documentation...
 
 ### Installation 
 
-Install from [ReaPack](https://reapack.com) or download [latest release](https://github.com/ak5k/reallm/releases/latest) for your computer architecture (e.g. `_x64.dll` for 64-bit Windows PC or `_arm64.dylib` for M1 Mac) and place it in your REAPER `UserPlugins` directory.
+Install from [ReaPack](https://reapack.com) or download [latest release](https://github.com/ak5k/reallm/releases/latest) for your computer architecture (e.g. `x64.dll` for 64-bit Windows PC or `arm64.dylib` for M1 Mac) and place it in your REAPER `UserPlugins` directory.
 
 [More information](https://forum.cockos.com/showthread.php?t=245445)
 
