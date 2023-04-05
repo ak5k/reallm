@@ -27,6 +27,7 @@ using namespace std;
 static MediaTrack* master_track {};
 static atomic<int> llm_state {};
 static bool include_monitoring_fx {true};
+static bool keep_pdc {false};
 static double pdc_limit {1};
 static double pdc_limit_abs {};
 static double reaper_version {};
@@ -100,7 +101,9 @@ V Network<T, U, V>::analyze(T& k, U& r, V v)
         return v;
     }
 
-    tr_pdc_to_disable.insert(GetTrackGUID(tr));
+    if (!keep_pdc) {
+        tr_pdc_to_disable.insert(GetTrackGUID(tr));
+    }
     auto fx_count = TrackFX_GetCount(tr);
     if (tr == master_track && include_monitoring_fx) {
         fx_count = fx_count + TrackFX_GetRecCount(tr);
@@ -155,7 +158,9 @@ V Network<T, U, V>::analyze(T& k, U& r, V v)
 
         if (pdc > 0) {
             pdc_temp = pdc_temp + pdc;
-            if (!fx.inst && !safe && pdc_current + pdc_temp > pdc_limit_abs) {
+            if (!fx.inst && !safe &&
+                (keep_pdc ? ceil((1.0 * pdc_current + pdc_temp) / bsize) * bsize
+                          : pdc_current + pdc_temp) > pdc_limit_abs) {
                 pdc_temp = pdc_temp - pdc;
                 auto k =
                     find(fx_to_disable.cbegin(), fx_to_disable.cend(), guid);
@@ -884,6 +889,15 @@ const char* defstring_Set =
 void Set(const char* parmname, const char* buf)
 {
     scoped_lock lk(m);
+
+    if (strcmp(parmname, "KEEPPDC") == 0) {
+        if (strlen(buf) > 0) {
+            keep_pdc = true;
+        }
+        else {
+            keep_pdc = false;
+        }
+    }
 
     if (strcmp(parmname, "SAFE") == 0) {
         string s {buf};
