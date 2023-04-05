@@ -14,6 +14,12 @@
 
 // isolate llm into its own safe space
 namespace llm {
+
+constexpr char extName[] = "ak5k";
+constexpr char key[] = "ReaLlm";
+constexpr char keySafe[] = "ReaLlmSafe";
+constexpr char keyTrPdc[] = "ReaLlmTrPdc";
+
 // 'import' stl stuff
 using namespace std;
 
@@ -78,7 +84,7 @@ std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
 }
 
 template <typename T, typename U, typename V>
-V& Network<T, U, V>::analyze(T& k, U& r, V& v)
+V Network<T, U, V>::analyze(T& k, U& r, V v)
 {
     auto& tr = k;
     auto& fx_map_ext = FXExt().fx_map_ext;
@@ -86,7 +92,7 @@ V& Network<T, U, V>::analyze(T& k, U& r, V& v)
     auto& fx_disabled = r.fx_disabled;
     auto& fx_safe = r.safe;
     auto& fx_unsafe = r.unsafe;
-    auto& pdc_current = v;
+    auto pdc_current = v;
     auto& tr_pdc_to_disable = r.tr_pdc_to_disable;
     auto pdc_temp {0};
 
@@ -370,10 +376,7 @@ static bool process_fx(FXState& fxstate)
 
 static void get_set_state(FXState& r, bool is_set = false)
 {
-    constexpr char extName[] = "ak5k";
-    constexpr char key[] = "ReaLlm";
-    constexpr char keySafe[] = "ReaLlmSafe";
-    constexpr char keyTrPdc[] = "ReaLlmTrPdc";
+    static string extNameTemp {}, extSafeTemp {}, extTrPdcTemp {};
 
     auto& fx_disabled = r.fx_disabled;
     auto& fx_safe = r.safe;
@@ -381,7 +384,7 @@ static void get_set_state(FXState& r, bool is_set = false)
 
     if (is_set) {
         char buf[BUFSZGUID];
-        string s;
+        string s {};
 
         s.clear();
         for (auto&& i : fx_disabled) {
@@ -393,7 +396,9 @@ static void get_set_state(FXState& r, bool is_set = false)
                 }
             }
         }
-        (void)SetProjExtState(0, extName, key, s.c_str());
+        if (extNameTemp.compare(s) != 0) {
+            (void)SetProjExtState(0, extName, key, s.c_str());
+        }
 
         s.clear();
         for (auto&& i : fx_safe) {
@@ -405,7 +410,9 @@ static void get_set_state(FXState& r, bool is_set = false)
                 }
             }
         }
-        (void)SetProjExtState(0, extName, keySafe, s.c_str());
+        if (extSafeTemp.compare(s) != 0) {
+            (void)SetProjExtState(0, extName, keySafe, s.c_str());
+        }
 
         s.clear();
         for (auto&& i : tr_pdc_disabled) {
@@ -417,7 +424,9 @@ static void get_set_state(FXState& r, bool is_set = false)
                 }
             }
         }
-        (void)SetProjExtState(0, extName, keyTrPdc, s.c_str());
+        if (extTrPdcTemp.compare(s) != 0) {
+            (void)SetProjExtState(0, extName, keyTrPdc, s.c_str());
+        }
     }
     else {
         string k {};
@@ -447,6 +456,7 @@ static void get_set_state(FXState& r, bool is_set = false)
         }
 
         if (p) {
+            extSafeTemp.assign(p);
             ss.str(p);
             while (ss >> k) {
                 auto v = guid_string_map.find(k);
@@ -470,6 +480,7 @@ static void get_set_state(FXState& r, bool is_set = false)
         }
 
         if (p) {
+            extNameTemp.assign(p);
             k.clear();
             ss.clear();
             ss.str(p);
@@ -495,6 +506,7 @@ static void get_set_state(FXState& r, bool is_set = false)
         }
 
         if (p) {
+            extTrPdcTemp.assign(p);
             k.clear();
             ss.clear();
             ss.str(p);
@@ -872,6 +884,14 @@ const char* defstring_Set =
 void Set(const char* parmname, const char* buf)
 {
     scoped_lock lk(m);
+
+    if (strcmp(parmname, "SAFE") == 0) {
+        string s {buf};
+        transform(s.begin(), s.end(), s.begin(), ::tolower);
+        if (s.find("clear") != string::npos) {
+            SetProjExtState(0, extName, keySafe, "");
+        }
+    }
 
     if (strcmp(parmname, "PDCLIMIT") == 0) {
         pdc_limit = stod(buf);

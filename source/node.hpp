@@ -55,9 +55,9 @@ class Network { // : public Node<T> {
     U& results;
     V res;
 
-    V& analyze(T& k, U& r, V& v);
+    V analyze(T& k, U& r, V v);
 
-    void traverse(T& k, U& r, V& v, bool& do_analyze)
+    void traverse(T& k, U& r, V v, bool& do_analyze)
     {
         if (do_analyze == true) {
             v = analyze(k, r, v); // accumulates results
