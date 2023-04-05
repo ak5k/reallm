@@ -884,6 +884,13 @@ const char* defstring_Set =
     "Instead of bypassing, changes FX parameter between val1 (low latency) and "
     "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
     "\n" //
+    "KEEPPDC : "
+    "Maintains PDC. Enable with any non-empty string. Disable (default) with "
+    "empty string."
+    "\n" //
+    "SAFE : "
+    "Call with \"clear\" to clear all safed FX plugins."
+    "\n" //
     ;
 
 void Set(const char* parmname, const char* buf)
