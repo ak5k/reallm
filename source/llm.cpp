@@ -929,7 +929,7 @@ void Set(const char* parmname, const char* buf)
 
     if (strcmp(parmname, "PARAMCHANGE") == 0) {
         std::string s {buf};
-        std::string delimiter = ",";
+        std::string delimiter = ";";
 
         size_t pos = 0;
         pos = s.find(delimiter);
