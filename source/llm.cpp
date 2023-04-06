@@ -882,7 +882,7 @@ const char* defstring_Set =
     "\n" //
     "PARAMCHANGE : "
     "Instead of bypassing, changes FX parameter between val1 (low latency) and "
-    "val2 (original). Use bufIn string format 'fx_name,param_index,val1,val2'."
+    "val2 (original). Use bufIn string format 'fx_name;param_index;val1;val2'."
     "\n" //
     "KEEPPDC : "
     "Maintains PDC. Enable with any non-empty string. Disable (default) with "
