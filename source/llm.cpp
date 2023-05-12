@@ -999,8 +999,8 @@ void Register(bool load)
         nullptr};
 
     if (load) {
-        if (reaper_version < 6.72) {
-            ShowConsoleMsg("ReaLlm requires REAPER 6.72 or later.");
+        if (reaper_version < 6.79) {
+            ShowConsoleMsg("ReaLlm requires REAPER 6.79 or later.");
             return;
         }
         command_id = plugin_register("custom_action", &action);
