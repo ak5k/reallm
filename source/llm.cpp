@@ -215,7 +215,7 @@ static void initialize(vector<MediaTrack*>& v)
         }
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-            auto fx = FX {tr, j};
+            FX {tr, j};
         }
     }
     if (include_monitoring_fx) {
