@@ -100,6 +100,7 @@ class FX : public Track {
     MediaTrack* tr;
     int idx;
     GUID* g;
+    char name[BUFSZGUID] = {0};
     FX()
         : Track {}
         , tr {}
@@ -122,6 +123,7 @@ class FX : public Track {
                 guid_string_map[std::string {buf}] = g;
             }
         }
+        TrackFX_GetNamedConfigParm(tr, fx_idx, "renamed_name", name, BUFSZGUID);
         fx_map[g] = std::move(*this);
     }
 
@@ -148,13 +150,11 @@ class FX : public Track {
 class FXExt : public FX {
   public:
     bool enabled;
-    char name[BUFSZGUID] = {0};
     int pdc;
     bool inst;
     FXExt()
         : FX {}
         , enabled {}
-        , name {}
         , pdc {}
         , inst {false}
     {
@@ -162,7 +162,6 @@ class FXExt : public FX {
     FXExt(MediaTrack* tr, int fx_idx)
         : FX {tr, fx_idx, true}
         , enabled {TrackFX_GetEnabled(tr, fx_idx)}
-        , name {}
         , pdc {}
         , inst {false}
     {

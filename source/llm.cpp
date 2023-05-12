@@ -56,6 +56,16 @@ unordered_map<GUID*, FX>& fx_map {FX::fx_map};
 unordered_map<GUID*, FXExt>& fx_map_ext {FXExt::fx_map_ext};
 unordered_map<GUID*, Track>& track_map {Track::track_map};
 
+void eraseSubStr(std::string& mainStr, const std::string& toErase)
+{
+    // Search for the substring in string
+    size_t pos = mainStr.find(toErase);
+    if (pos != std::string::npos) {
+        // If found then erase it from string
+        mainStr.erase(pos, toErase.length());
+    }
+}
+
 template <typename T, typename U, typename V>
 std::vector<T> Network<T, U, V>::get_neighborhood(T& k)
 {
@@ -205,7 +215,7 @@ static void initialize(vector<MediaTrack*>& v)
         }
 
         for (auto j = 0; j < TrackFX_GetCount(tr); j++) {
-            FX {tr, j};
+            auto fx = FX {tr, j};
         }
     }
     if (include_monitoring_fx) {
@@ -227,7 +237,18 @@ static bool process_fx(FXState& fxstate)
     auto& fx_safe = fxstate.safe;
     auto& tr_pdc_disabled = fxstate.tr_pdc_disabled;
     auto& tr_pdc_to_disable = fxstate.tr_pdc_to_disable;
+    char name[BUFSZGUID] = {0};
     fx_to_enable.reserve(fx_to_disable.size());
+
+    for (auto&& i : llm::FX::fx_map) {
+        if (!TrackFX_GetEnabled(i.second.tr, i.second.idx) &&
+            strstr(i.second.name, "llm: ")) {
+            if (std::find(fx_disabled.begin(), fx_disabled.end(), i.second.g) ==
+                fx_disabled.end()) {
+                fx_disabled.push_back(i.second.g);
+            }
+        }
+    }
 
     for (auto i = fx_disabled.cbegin(); i != fx_disabled.cend();) {
         auto v = find(fx_to_disable.cbegin(), fx_to_disable.cend(), *i);
@@ -278,6 +299,11 @@ static bool process_fx(FXState& fxstate)
                 auto fx = fx_map.at(i);
                 if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                     TrackFX_SetEnabled(fx.tr, fx.idx, true);
+                    TrackFX_SetNamedConfigParm(
+                        fx.tr,
+                        fx.idx,
+                        "renamed_name",
+                        "");
                 }
             }
         }
@@ -326,6 +352,20 @@ static bool process_fx(FXState& fxstate)
                 auto fx = fx_map.at(i);
                 if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                     TrackFX_SetEnabled(fx.tr, fx.idx, false);
+                    // TrackFX_GetNamedConfigParm(
+                    //     fx.tr,
+                    //     fx.idx,
+                    //     "original_name",
+                    //     name,
+                    //     BUFSZGUID);
+                    TrackFX_GetFXName(fx.tr, fx.idx, name, BUFSZGUID);
+                    string s = "llm: ";
+                    s.append(name);
+                    TrackFX_SetNamedConfigParm(
+                        fx.tr,
+                        fx.idx,
+                        "renamed_name",
+                        s.c_str());
                     fx_disabled.push_back(i);
                 }
             }
@@ -567,7 +607,6 @@ static void Do()
         return;
     }
 
-    reaper_version = stod(GetAppVersion());
     char buf[BUFSZSMALL];
     if (GetAudioDeviceInfo("BSIZE", buf, BUFSZSMALL)) {
         bsize = stoi(buf);
@@ -576,9 +615,9 @@ static void Do()
 
     vector<MediaTrack*> input_tracks {};
 
-    initialize(input_tracks);
-
     FXState fx_state {};
+
+    initialize(input_tracks);
 
     pdc_max = 0;
     get_set_state(fx_state);
