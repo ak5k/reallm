@@ -100,7 +100,7 @@ class FX : public Track {
     MediaTrack* tr;
     int idx;
     GUID* g;
-    char name[BUFSZGUID] = {0};
+    char name[BUFSZCHUNK] = {0};
     FX()
         : Track {}
         , tr {}
@@ -123,7 +123,12 @@ class FX : public Track {
                 guid_string_map[std::string {buf}] = g;
             }
         }
-        TrackFX_GetNamedConfigParm(tr, fx_idx, "renamed_name", name, BUFSZGUID);
+        TrackFX_GetNamedConfigParm(
+            tr,
+            fx_idx,
+            "renamed_name",
+            name,
+            BUFSZCHUNK);
         fx_map[g] = std::move(*this);
     }
 
@@ -143,7 +148,7 @@ class FX : public Track {
     // static std::unordered_map<GUID*, FX> fx_map;
 
   private:
-    char buf[BUFSZGUID] = {0};
+    char buf[BUFSZCHUNK] = {0};
     int tr_idx_;
 };
 
@@ -165,7 +170,7 @@ class FXExt : public FX {
         , pdc {}
         , inst {false}
     {
-        TrackFX_GetFXName(tr, idx, name, BUFSZGUID);
+        TrackFX_GetFXName(tr, idx, name, BUFSZCHUNK);
         TrackFX_GetNamedConfigParm(tr, idx, "pdc", buf, BUFSZSMALL);
         if (strlen(buf) == 0) {
             strncpy(buf, "0", BUFSZSMALL);
@@ -186,7 +191,7 @@ class FXExt : public FX {
     // static std::unordered_map<GUID*, FXExt> fx_map_ext;
 
   private:
-    char buf[BUFSZGUID] = {0};
+    char buf[BUFSZCHUNK] = {0};
 };
 
 void Register(bool load);

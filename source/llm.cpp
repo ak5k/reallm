@@ -237,7 +237,7 @@ static bool process_fx(FXState& fxstate)
     auto& fx_safe = fxstate.safe;
     auto& tr_pdc_disabled = fxstate.tr_pdc_disabled;
     auto& tr_pdc_to_disable = fxstate.tr_pdc_to_disable;
-    char name[BUFSZGUID] = {0};
+    char name[BUFSZCHUNK] = {0};
     fx_to_enable.reserve(fx_to_disable.size());
 
     for (auto&& i : llm::FX::fx_map) {
@@ -299,11 +299,19 @@ static bool process_fx(FXState& fxstate)
                 auto fx = fx_map.at(i);
                 if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                     TrackFX_SetEnabled(fx.tr, fx.idx, true);
+                    TrackFX_GetNamedConfigParm(
+                        fx.tr,
+                        fx.idx,
+                        "renamed_name",
+                        name,
+                        BUFSZCHUNK);
+                    string s = name;
+                    eraseSubStr(s, "llm: ");
                     TrackFX_SetNamedConfigParm(
                         fx.tr,
                         fx.idx,
                         "renamed_name",
-                        "");
+                        s.c_str());
                 }
             }
         }
@@ -357,8 +365,8 @@ static bool process_fx(FXState& fxstate)
                     //     fx.idx,
                     //     "original_name",
                     //     name,
-                    //     BUFSZGUID);
-                    TrackFX_GetFXName(fx.tr, fx.idx, name, BUFSZGUID);
+                    //     BUFSZCHUNK);
+                    TrackFX_GetFXName(fx.tr, fx.idx, name, BUFSZCHUNK);
                     string s = "llm: ";
                     s.append(name);
                     TrackFX_SetNamedConfigParm(
@@ -428,7 +436,7 @@ static void get_set_state(FXState& r, bool is_set = false)
     auto& tr_pdc_disabled = r.tr_pdc_disabled;
 
     if (is_set) {
-        char buf[BUFSZGUID];
+        char buf[BUFSZCHUNK];
         string s {};
 
         s.clear();
