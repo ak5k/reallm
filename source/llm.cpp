@@ -237,7 +237,6 @@ static bool process_fx(FXState& fxstate)
     auto& fx_safe = fxstate.safe;
     auto& tr_pdc_disabled = fxstate.tr_pdc_disabled;
     auto& tr_pdc_to_disable = fxstate.tr_pdc_to_disable;
-    char name[BUFSZCHUNK] = {0};
     fx_to_enable.reserve(fx_to_disable.size());
 
     for (auto&& i : llm::FX::fx_map) {
