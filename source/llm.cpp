@@ -299,13 +299,7 @@ static bool process_fx(FXState& fxstate)
                 auto fx = fx_map.at(i);
                 if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                     TrackFX_SetEnabled(fx.tr, fx.idx, true);
-                    TrackFX_GetNamedConfigParm(
-                        fx.tr,
-                        fx.idx,
-                        "renamed_name",
-                        name,
-                        BUFSZCHUNK);
-                    string s = name;
+                    string s = fx.name;
                     eraseSubStr(s, "llm: ");
                     TrackFX_SetNamedConfigParm(
                         fx.tr,
@@ -360,15 +354,8 @@ static bool process_fx(FXState& fxstate)
                 auto fx = fx_map.at(i);
                 if (ValidatePtr2(0, fx.tr, "MediaTrack*")) {
                     TrackFX_SetEnabled(fx.tr, fx.idx, false);
-                    // TrackFX_GetNamedConfigParm(
-                    //     fx.tr,
-                    //     fx.idx,
-                    //     "original_name",
-                    //     name,
-                    //     BUFSZCHUNK);
-                    TrackFX_GetFXName(fx.tr, fx.idx, name, BUFSZCHUNK);
                     string s = "llm: ";
-                    s.append(name);
+                    s.append(fx.name);
                     TrackFX_SetNamedConfigParm(
                         fx.tr,
                         fx.idx,

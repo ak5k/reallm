@@ -123,12 +123,8 @@ class FX : public Track {
                 guid_string_map[std::string {buf}] = g;
             }
         }
-        TrackFX_GetNamedConfigParm(
-            tr,
-            fx_idx,
-            "renamed_name",
-            name,
-            BUFSZCHUNK);
+
+        TrackFX_GetFXName(tr, fx_idx, name, BUFSZCHUNK);
         fx_map[g] = std::move(*this);
     }
 
@@ -145,7 +141,6 @@ class FX : public Track {
     }
 
     static std::unordered_map<GUID*, FX> fx_map;
-    // static std::unordered_map<GUID*, FX> fx_map;
 
   private:
     char buf[BUFSZCHUNK] = {0};
