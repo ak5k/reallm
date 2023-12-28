@@ -1,136 +1,136 @@
-# heavily 'inspired' by cfillions reapack/reaimgui
+version: "{build}-{branch}"
 
-version: '{build}-{branch}'
-
-before_build:
-  - git submodule update --init --recursive --depth 1
 build_script:
+  - export VCPKG_OVERLAY_TRIPLETS=cmake/vcpkg-triplets
   - cmake -B build -DCMAKE_BUILD_TYPE=Release
-    -DVCPKG_TARGET_TRIPLET=$TRIPLET -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN
+    -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake
+    -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
     -DCMAKE_OSX_ARCHITECTURES=$ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
-  - cmake --build build --target reaper_reallm
-  - '[ "$ARCH" != `uname -m` ] || cmake --build build --target reaper_reallm'
+  - cmake --build build
 
 for:
-  - matrix: { only: [appveyor_build_worker_image: &linux Ubuntu2004] }
+  - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1804 ] }
+    cache:
+      - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install: |-
-      set -e
+      # set -e
+
       sudo sed -i '/arch=/! s/^deb/deb [arch=amd64,i386]/' /etc/apt/sources.list
-      awk '
-      $3 !~ /ubuntu\.com/ { next }
-      $1 == "deb" {
-        $2 = "[arch=armhf,arm64]";
-        $3 = "http://ports.ubuntu.com/ubuntu-ports/"
-      } 1' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list > /dev/null
 
       install-deps() {
+        # sudo add-apt-repository --remove "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main"
         local arch="$1"; shift
-        local native=("$@")
-        # local target=(libboost-dev)
+        local native=("$@" php-cli qemu-user-binfmt )
+        local target=()
+
         sudo dpkg --add-architecture $arch
         sudo apt-get update -qq
         sudo apt-get install -qq aptitude > /dev/null
-        # sudo aptitude install -yR ${native[@]} ${target[@]/%/:$arch} > /dev/null
-        sudo aptitude install -yR ${native[@]} > /dev/null
+        sudo aptitude install -yR ${native[@]} ${target[@]/%/:$arch} > /dev/null
       }
 
-      sudo update-alternatives --set gcc /usr/bin/gcc-9
+      sudo update-alternatives --set gcc /usr/bin/gcc-7
+
       case $ARCH in
       x86_64)
         install-deps amd64
         ;;
       i686)
         install-deps i386 g++-multilib
-        export TOOLCHAIN=cmake/linux-cross.cmake \
+        export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
                TOOLCHAIN_PREFIX=i386-linux-gnu
         ;;
       armv7l)
         install-deps armhf g++-arm-linux-gnueabihf
-        export TOOLCHAIN=cmake/linux-cross.cmake \
+        export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
                TOOLCHAIN_PREFIX=arm-linux-gnueabihf
         ;;
       aarch64)
         install-deps arm64 g++-aarch64-linux-gnu
-        export TOOLCHAIN=cmake/linux-cross.cmake \
+        export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
                TOOLCHAIN_PREFIX=aarch64-linux-gnu
         ;;
       esac
     artifacts:
-      - path: build/reaper_reallm*.so
+      - path: build/reaper_*.so
 
-  - matrix:
-      {
-        only:
-          [
-            appveyor_build_worker_image: macos,
-            appveyor_build_worker_image: macos-bigsur,
-            appveyor_build_worker_image: macos-mojave,
-            appveyor_build_worker_image: macos-catalina,
-          ],
-      }
+  - matrix: { only: [ appveyor_build_worker_image: macos, appveyor_build_worker_image: macos-mojave ] }
     cache:
-      - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/auto-osx.cmake
+      # - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install:
-      - TRIPLET=auto-osx TOOLCHAIN=~/vcpkg/scripts/buildsystems/vcpkg.cmake
-      - export VCPKG_OVERLAY_TRIPLETS=cmake/vcpkg-triplets
-
       - |-
         case $ARCH in
-        *arm64*) export DEPLOY_TARGET=11.0 XCODE_VERSION=12.3  ;;
-        *)     export DEPLOY_TARGET=10.9 XCODE_VERSION=9.4.1;;
+        arm64)
+          DEPLOY_TARGET=11.0
+          sudo xcode-select -s /Applications/Xcode-12.3.app
+          ;;
+        *)
+          DEPLOY_TARGET=10.9
+          export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk
+          curl -fsSLO https://github.com/phracker/MacOSX-SDKs/releases/download/10.15/MacOSX10.10.sdk.tar.xz
+          echo 608a89db8b4be150a945871230b5ba5d4767a8500bc5fe76ddf10f5cec5ef513 MacOSX10.10.sdk.tar.xz | sha256sum -c
+          sudo tar xf MacOSX10.10.sdk.tar.xz -C /Library/Developer/CommandLineTools/SDKs
+          sudo xcode-select -s /Library/Developer/CommandLineTools
+          ;;
         esac
-      - sudo xcode-select -s /Applications/Xcode-$XCODE_VERSION.app
-      # https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
-      - sudo curl -k https://curl.se/ca/cacert.pem -o /etc/ssl/cert.pem
-    artifacts:
-      - path: build/reaper_reallm*.dylib
 
-  - matrix: { only: [appveyor_build_worker_image: &windows Visual Studio 2022] }
+      # don't use LibXml2/SQLite3 from Mono
+      - sudo rm -r /Library/Frameworks/Mono.framework
+      - |-
+        if [ "$appveyor_build_worker_image" = "macos-mojave" ]; then
+          sudo curl -k https://curl.se/ca/cacert.pem -o /etc/ssl/cert.pem
+
+        fi
+    artifacts:
+      - path: build/reaper_*.dylib
+
+  - matrix: { only: [ appveyor_build_worker_image: &windows Visual Studio 2022 ] }
+
     cache:
       - build\vcpkg_installed -> vcpkg.json
     install:
       - if "%ARCH%" == "x64" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
       - if "%ARCH%" == "x86" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
-
     build_script:
-      # - cmake -B build -A %ARCH% -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      - cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
         -DVCPKG_TARGET_TRIPLET=%ARCH%-windows-static
         -DCMAKE_TOOLCHAIN_FILE=C:\Tools\vcpkg\scripts\buildsystems\vcpkg.cmake
       - cmake --build build
     artifacts:
-      - path: build\reaper_reallm*.dll
-      #- path: scripts\*.lua
+      - path: build\**\reaper_*.dll
+      - path: build\**\reaper_*.pdb
+      - path: scripts\ReaBlink_Monitor.lua
+
 
 environment:
   matrix:
-    - job_name: macOS x86 32-bit
-      appveyor_build_worker_image: macos-mojave
-      ARCH: i386
-    - job_name: macOS ARM 64-bit
-      appveyor_build_worker_image: macos-catalina
-      ARCH: arm64 #;x86_64
-    - job_name: Linux x86 64-bit
-      appveyor_build_worker_image: *linux
-      ARCH: x86_64
-    - job_name: macOS x86 64-bit
-      appveyor_build_worker_image: macos-mojave
-      ARCH: x86_64
-    - job_name: Windows 64-bit
-      appveyor_build_worker_image: *windows
-      ARCH: x64
     - job_name: Windows 32-bit
       appveyor_build_worker_image: *windows
       ARCH: x86
     - job_name: Linux x86 32-bit
       appveyor_build_worker_image: *linux
       ARCH: i686
-    - job_name: Linux ARM 64-bit
-      appveyor_build_worker_image: *linux
-      ARCH: aarch64
+    - job_name: macOS x86 32-bit
+      appveyor_build_worker_image: macos-mojave
+      ARCH: i386
     - job_name: Linux ARM 32-bit
       appveyor_build_worker_image: *linux
       ARCH: armv7l
+    - job_name: macOS x86 64-bit
+      appveyor_build_worker_image: macos-mojave
+      ARCH: x86_64
+    - job_name: macOS ARM 64-bit
+      appveyor_build_worker_image: macos-catalina
+      ARCH: arm64
+    - job_name: Linux x86 64-bit
+      appveyor_build_worker_image: *linux
+      ARCH: x86_64
+    - job_name: Linux ARM 64-bit
+      appveyor_build_worker_image: *linux
+      ARCH: aarch64
+    - job_name: Windows 64-bit
+      appveyor_build_worker_image: *windows
+      ARCH: x64
 
 deploy:
   provider: GitHub

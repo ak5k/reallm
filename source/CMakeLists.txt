@@ -1,7 +1,5 @@
-add_library(
-	reallm OBJECT
+target_sources(
+	${PROJECT_NAME} PRIVATE
 	main.cpp
 	llm.cpp
 	)
-
-target_link_libraries(reallm common)

@@ -1,5 +1,8 @@
-cmake_minimum_required(VERSION 3.19)
-project(reaper_reallm LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.15)
+
+project(reallm VERSION 0.5.0 LANGUAGES C CXX)
+add_library(${PROJECT_NAME} SHARED)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
 include(CheckCompilerFlag)
 include(CheckIncludeFileCXX)
@@ -14,7 +17,94 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/README)
       )
 endif()
 
+if(WIN32)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+# path for external 3rd party library dependencies 
+set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/vendor)
+
+FILE(GLOB header_paths 
+    ${PROJECT_LIB_DIR}/*/include
+    ${PROJECT_LIB_DIR}/*/sdk
+    )
+
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${header_paths})
+
+
+# symlink WDL to reaper-sdk
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            # source
+            "${PROJECT_LIB_DIR}/WDL/WDL"
+            # target
+            "${PROJECT_LIB_DIR}/reaper-sdk/WDL"
+)
+
+if(WIN32)
+  target_compile_options(
+    ${PROJECT_NAME} 
+      PRIVATE 
+      /W3 /WX
+      /wd4244
+      /wd4996
+      )
+else()
+  target_compile_options(
+    ${PROJECT_NAME}
+      PRIVATE
+      -Wall -Wextra -Werror -Wpedantic 
+      -Wno-conversion
+      -Wno-format
+      -Wno-implicit-fallthrough 
+      -Wno-missing-braces
+      -Wno-missing-field-initializers
+      -Wno-shadow
+      -Wno-sign-compare
+      -Wno-switch 
+      -Wno-uninitialized 
+      -Wno-unused 
+      -Wno-unused-function 
+      -Wno-unused-label
+      -Wno-unused-parameter
+      -Wno-unused-value
+      -Wno-unused-variable
+  )
+endif()
+
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    CACHE STRING "")
+endif()
+
+if(DEFINED ENV{VCPKG_DEFAULT_TRIPLET} AND NOT DEFINED VCPKG_TARGET_TRIPLET)
+  set(VCPKG_TARGET_TRIPLET "$ENV{VCPKG_DEFAULT_TRIPLET}" CACHE STRING "")
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+find_package(WDL REQUIRED)
+
+if(NOT WIN32)
+  find_package(SWELL REQUIRED)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE WDL::WDL)
+
+if(SWELL_FOUND)
+  target_link_libraries(${PROJECT_NAME} PRIVATE SWELL::swell)
+
+  # Transpile the Win32 resource file
+  find_package(PHP REQUIRED)
+  add_custom_command(
+    OUTPUT  resource.rc_mac_dlg resource.rc_mac_menu
+    COMMAND ${CMAKE_COMMAND} -E copy
+      ${CMAKE_CURRENT_SOURCE_DIR}/resource.rc ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${PHP_EXECUTABLE} ${SWELL_RESGEN} --quiet resource.rc
+    DEPENDS ${SWELL_RESGEN}
+    MAIN_DEPENDENCY resource.rc
+  )
+endif()
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   if(WIN32)
@@ -26,13 +116,11 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   endif()
 
   set(CMAKE_INSTALL_PREFIX "${USER_CONFIG_DIR}/REAPER" CACHE PATH
-    "REAPER resource path where to install ReaLlm" FORCE)
+    "REAPER resource path where to install ReaPack" FORCE)
 endif()
 
-
 if(CMAKE_OSX_ARCHITECTURES)
-  # list(JOIN CMAKE_OSX_ARCHITECTURES "-" ARCH_NAME)
-  list(GET CMAKE_OSX_ARCHITECTURES 0 ARCH_NAME)
+  list(JOIN CMAKE_OSX_ARCHITECTURES "-" ARCH_NAME)
 elseif(MSVC_CXX_ARCHITECTURE_ID)
   set(ARCH_NAME ${MSVC_CXX_ARCHITECTURE_ID})
 else()
@@ -41,126 +129,28 @@ endif()
 
 STRING(TOLOWER "${ARCH_NAME}" ARCH_NAME)
 
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL     ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE        ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
-
 if(VCPKG_TOOLCHAIN)
   set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release)
   set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
 endif()
 
-if(WIN32)
-  foreach(arg
-    CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG
-    CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE
-    CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    CMAKE_C_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_MINSIZEREL
-  )
-    # Embed debug information in the object files
-    string(REGEX REPLACE "/Z[iI]" "/Z7" ${arg} "${${arg}}")
-  endforeach()
-
-  add_compile_options(
-
-    # Exception handling model
-    /EHsc
-
-    # Enhance optimized debugging
-    $<$<NOT:$<CONFIG:Debug>>:/Zo>
-
-    # Eliminate duplicate strings
-    $<$<NOT:$<CONFIG:Debug>>:/GF>
-
-    # Enable function-level linking
-    $<$<NOT:$<CONFIG:Debug>>:/Gy>
-
-    # Remove unreferenced COMDAT
-    $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
-  )
-
-  add_link_options(
-    # Remove unreferenced code
-    $<$<NOT:$<CONFIG:Debug>>:/OPT:REF>
-
-    # Remove duplicate sections
-    $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
-
-    # # Use relative path to the PDB file to avoid exposing the full path
-    # /PDBALTPATH:%_PDB%
-  )
-else()
-  add_compile_options(
-    -fsigned-char -fstack-protector-strong
-  )
-
-  if(APPLE)
-    add_link_options(-Wl,-dead_strip)
-  endif()
-
-  check_linker_flag(CXX -Wl,--no-undefined HAVE_NO_UNDEFINED)
-  if(HAVE_NO_UNDEFINED)
-    add_link_options(-Wl,--no-undefined)
-  endif()
-endif()
-
-add_library(common INTERFACE)
-target_include_directories(
-  common SYSTEM INTERFACE
-  ${CMAKE_SOURCE_DIR}/include
-  ${CMAKE_SOURCE_DIR}/vendor/reaper-sdk/sdk)
-if(WIN32)
-  target_compile_options(common INTERFACE
-    /W3 /wd4996
-    /WX
-    )
-  target_compile_definitions(common INTERFACE NOMINMAX UNICODE)
-else()
-  target_compile_options(common INTERFACE
-    -Wall -Wextra -Wpedantic -Werror
-  )
-
-endif()
-
-check_include_file_cxx(optional HAS_STD_OPTIONAL)
-if(HAS_STD_OPTIONAL)
-  target_compile_definitions(common INTERFACE HAS_STD_OPTIONAL)
-endif()
-
-check_include_file_cxx(variant HAS_STD_VARIANT)
-if(HAS_STD_VARIANT)
-  target_compile_definitions(common INTERFACE HAS_STD_VARIANT)
-endif()
-
-add_library(${PROJECT_NAME} SHARED)
-
 set_target_properties(${PROJECT_NAME} PROPERTIES
   PREFIX "" # disable the "lib" prefix
-  OUTPUT_NAME "reaper_reallm-${ARCH_NAME}"
+  OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
 )
-set(REAPER_USER_PLUGINS "UserPlugins")
 
+# if(WIN32)
+#   add_link_options(
+#     # Use relative path to the PDB file to avoid exposing the full path
+#     /PDBALTPATH:%_PDB%
+#   )
+# endif()
+
+add_subdirectory(source)
+
+set(REAPER_USER_PLUGINS "UserPlugins")
 install(TARGETS ${PROJECT_NAME}
-  CONFIGURATIONS Debug Release
+  COMPONENT ${PROJECT_NAME}
   RUNTIME DESTINATION "${REAPER_USER_PLUGINS}" # Windows .dll
   LIBRARY DESTINATION "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
 )
-# install(FILES $<TARGET_PDB_FILE:${PROJECT_NAME}> DESTINATION "${REAPER_USER_PLUGINS}" OPTIONAL)
-
-add_subdirectory(${CMAKE_SOURCE_DIR}/source)
-target_link_libraries(${PROJECT_NAME} reallm Threads::Threads)
-
-find_package(WDL REQUIRED)
-target_link_libraries(reallm WDL::WDL)
-
-if(NOT WIN32)
-  find_package(SWELL REQUIRED)
-  target_link_libraries(reallm SWELL::swell)
-endif()
