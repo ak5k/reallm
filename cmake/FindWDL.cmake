@@ -4,7 +4,7 @@ endif()
 
 find_path(WDL_INCLUDE_DIR
   NAMES WDL/wdltypes.h
-  PATHS ${CMAKE_SOURCE_DIR}/lib/WDL
+  PATHS ${CMAKE_SOURCE_DIR}/vendor/WDL
   NO_DEFAULT_PATH
 )
 mark_as_advanced(WDL_INCLUDE_DIR)
