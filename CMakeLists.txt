@@ -10,7 +10,6 @@ include(FindGit)
 include(FindThreads)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -107,14 +106,9 @@ endif()
 
 add_library(${PROJECT_NAME} SHARED)
 add_subdirectory(source)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(${PROJECT_NAME} reaper_plugin)
-
-if(WIN32)
-  # target_compile_definitions(${PROJECT_NAME} PRIVATE WIN32_MEAN_AND_LEAN=1)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE HIRES_TIMER_REABLINK=1 WIN32_MEAN_AND_LEAN=1)
-  target_link_libraries(${PROJECT_NAME} Winmm.lib)
-endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
   PREFIX "" # disable the "lib" prefix
