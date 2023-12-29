@@ -54,7 +54,7 @@ for:
     artifacts:
       - path: build/reaper_*.so
 
-  - matrix: { only: [ appveyor_build_worker_image: macos, appveyor_build_worker_image: macos-mojave ] }
+  - matrix: { only: [ appveyor_build_worker_image: macos-catalina, appveyor_build_worker_image: macos-mojave ] }
     cache:
       # - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install:
