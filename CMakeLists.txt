@@ -18,6 +18,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # path for external 3rd party library dependencies 
 set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/vendor)
 
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/WDL/WDL)
+  execute_process(
+      COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1 
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+      )
+endif()
 # symlink WDL to reaper-sdk
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink
