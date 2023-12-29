@@ -1,36 +1,23 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(reallm VERSION 0.5.0 LANGUAGES C CXX)
-add_library(${PROJECT_NAME} SHARED)
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
+project(reallm VERSION 0.5.0 LANGUAGES CXX)
 
+include(FetchContent)
 include(CheckCompilerFlag)
 include(CheckIncludeFileCXX)
 include(CheckLinkerFlag)
 include(FindGit)
 include(FindThreads)
 
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/vendor/reaper-sdk/README)
-    execute_process(
-      COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --depth 1 
-      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-      )
-endif()
-
-if(WIN32)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # path for external 3rd party library dependencies 
 set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/vendor)
-
-FILE(GLOB header_paths 
-    ${PROJECT_LIB_DIR}/*/include
-    ${PROJECT_LIB_DIR}/*/sdk
-    )
-
-target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${header_paths})
-
 
 # symlink WDL to reaper-sdk
 execute_process(
@@ -40,37 +27,6 @@ execute_process(
             # target
             "${PROJECT_LIB_DIR}/reaper-sdk/WDL"
 )
-
-if(WIN32)
-  target_compile_options(
-    ${PROJECT_NAME} 
-      PRIVATE 
-      /W3 /WX
-      /wd4244
-      /wd4996
-      )
-else()
-  target_compile_options(
-    ${PROJECT_NAME}
-      PRIVATE
-      -Wall -Wextra -Werror -Wpedantic 
-      -Wno-conversion
-      -Wno-format
-      -Wno-implicit-fallthrough 
-      -Wno-missing-braces
-      -Wno-missing-field-initializers
-      -Wno-shadow
-      -Wno-sign-compare
-      -Wno-switch 
-      -Wno-uninitialized 
-      -Wno-unused 
-      -Wno-unused-function 
-      -Wno-unused-label
-      -Wno-unused-parameter
-      -Wno-unused-value
-      -Wno-unused-variable
-  )
-endif()
 
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
@@ -83,16 +39,24 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+FILE(GLOB header_paths 
+    ${PROJECT_LIB_DIR}/*/sdk
+    )
+add_library(reaper_plugin INTERFACE IMPORTED)
+target_include_directories(
+    reaper_plugin INTERFACE
+    ${header_paths})
+
 find_package(WDL REQUIRED)
 
 if(NOT WIN32)
   find_package(SWELL REQUIRED)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE WDL::WDL)
+target_link_libraries(reaper_plugin INTERFACE WDL::WDL)
 
 if(SWELL_FOUND)
-  target_link_libraries(${PROJECT_NAME} PRIVATE SWELL::swell)
+  target_link_libraries(reaper_plugin INTERFACE SWELL::swell)
 
   # Transpile the Win32 resource file
   find_package(PHP REQUIRED)
@@ -134,11 +98,6 @@ if(VCPKG_TOOLCHAIN)
   set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES
-  PREFIX "" # disable the "lib" prefix
-  OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
-)
-
 # if(WIN32)
 #   add_link_options(
 #     # Use relative path to the PDB file to avoid exposing the full path
@@ -146,7 +105,21 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 #   )
 # endif()
 
+add_library(${PROJECT_NAME} SHARED)
 add_subdirectory(source)
+
+target_link_libraries(${PROJECT_NAME} reaper_plugin)
+
+if(WIN32)
+  # target_compile_definitions(${PROJECT_NAME} PRIVATE WIN32_MEAN_AND_LEAN=1)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE HIRES_TIMER_REABLINK=1 WIN32_MEAN_AND_LEAN=1)
+  target_link_libraries(${PROJECT_NAME} Winmm.lib)
+endif()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  PREFIX "" # disable the "lib" prefix
+  OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
+)
 
 set(REAPER_USER_PLUGINS "UserPlugins")
 install(TARGETS ${PROJECT_NAME}
@@ -154,3 +127,34 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION "${REAPER_USER_PLUGINS}" # Windows .dll
   LIBRARY DESTINATION "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
 )
+
+if(WIN32)
+  target_compile_options(
+    ${PROJECT_NAME} 
+      PRIVATE 
+      /W3 /WX
+      /wd4244
+      /wd4996
+      )
+else()
+  target_compile_options(
+    ${PROJECT_NAME}
+      PRIVATE
+      -Wall -Wextra -Werror -Wpedantic 
+      -Wno-conversion
+      -Wno-format
+      -Wno-implicit-fallthrough 
+      -Wno-missing-braces
+      -Wno-missing-field-initializers
+      -Wno-shadow
+      -Wno-sign-compare
+      -Wno-switch 
+      -Wno-uninitialized 
+      -Wno-unused 
+      -Wno-unused-function 
+      -Wno-unused-label
+      -Wno-unused-parameter
+      -Wno-unused-value
+      -Wno-unused-variable
+  )
+endif()
