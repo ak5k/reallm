@@ -1,6 +1,6 @@
 #include <reaper_plugin_functions.h>
 
-namespace reallm2
+namespace reallm
 {
 void Register();
-} // namespace reallm2
+} // namespace reallm
