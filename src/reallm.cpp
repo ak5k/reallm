@@ -730,10 +730,12 @@ void SetClearSafe()
   fx_set_prev.clear();
 }
 
-const char* defstring_SetParameterChange = "void\0"
-                                           "const char*,int,double,double\0"
-                                           "fx_name,parameter_index,val1,val2\0"
-                                           "Set parameter change";
+const char* defstring_SetParameterChange =
+  "void\0"
+  "const char*,int,double,double\0"
+  "fx_name,parameter_index,val1,val2\0"
+  "Set parameter change. Set val1 = val2 to clear change. Set parameter_index "
+  "= -666 to clear all changes";
 
 void SetParameterChange(const char* fx_name, int parameter_index, double val1,
                         double val2)
