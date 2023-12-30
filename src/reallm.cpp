@@ -233,12 +233,6 @@ auto OnAction(KbdSectionInfo* sec, int command, int val, int valhw, int relmode,
   return true;
 }
 
-void Register()
-{
-  command_id = plugin_register("custom_action", &action);
-  plugin_register("toggleaction", (void*)ToggleActionCallback);
-  plugin_register("hookcommand2", (void*)OnAction);
-}
 } // namespace reallm
 
 namespace reallm
@@ -711,15 +705,21 @@ void main()
   // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
+const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit";
+
 void SetPdcLimit(double pdc_factor)
 {
   pdc_factor = abs(pdc_factor);
 }
 
+const char* defstring_SetMonitoringFX = "void\0bool\0enable\0Set monitoring fx";
+
 void SetMonitoringFX(bool enable)
 {
   include_monitoring_fx = enable;
 }
+
+const char* defstring_SetClearSafe = "void\0\0\0Set clear safe";
 
 void SetClearSafe()
 {
@@ -729,6 +729,11 @@ void SetClearSafe()
   }
   fx_set_prev.clear();
 }
+
+const char* defstring_SetParameterChange = "void\0"
+                                           "const char*,int,double,double\0"
+                                           "fx_name,parameter_index,val1,val2\0"
+                                           "Set parameter change";
 
 void SetParameterChange(const char* fx_name, int parameter_index, double val1,
                         double val2)
@@ -758,8 +763,53 @@ void SetParameterChange(const char* fx_name, int parameter_index, double val1,
     ParameterChange(fx_name, parameter_index, val1, val2));
 }
 
+const char* defstring_SetKeepPdc = "void\0bool\0enable\0Set keep pdc";
+
 void SetKeepPdc(bool enable)
 {
   keep_pdc = enable;
+}
+
+const char* defstring_Do = "void\0\0\0Do";
+
+void Register()
+{
+  command_id = plugin_register("custom_action", &action);
+  plugin_register("toggleaction", (void*)ToggleActionCallback);
+  plugin_register("hookcommand2", (void*)OnAction);
+
+  plugin_register("API_Llm_Do", (void*)main);
+  plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
+  plugin_register("APIvararg_Llm_Do",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
+
+  plugin_register("API_Llm_SetKeepPdc", (void*)SetKeepPdc);
+  plugin_register("APIdef_Llm_SetKeepPdc", (void*)defstring_SetKeepPdc);
+  plugin_register("APIvararg_Llm_SetKeepPdc",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>));
+
+  plugin_register("API_Llm_SetParameterChange", (void*)SetParameterChange);
+  plugin_register("APIdef_Llm_SetParameterChange",
+                  (void*)defstring_SetParameterChange);
+  plugin_register(
+    "APIvararg_Llm_SetParameterChange",
+    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>));
+
+  plugin_register("API_Llm_SetClearSafe", (void*)SetClearSafe);
+  plugin_register("APIdef_Llm_SetClearSafe", (void*)defstring_SetClearSafe);
+  plugin_register("APIvararg_Llm_SetClearSafe",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>));
+
+  plugin_register("API_Llm_SetMonitoringFX", (void*)SetMonitoringFX);
+  plugin_register("APIdef_Llm_SetMonitoringFX",
+                  (void*)defstring_SetMonitoringFX);
+  plugin_register(
+    "APIvararg_Llm_SetMonitoringFX",
+    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>));
+
+  plugin_register("API_Llm_SetPdcLimit", (void*)SetPdcLimit);
+  plugin_register("APIdef_Llm_SetPdcLimit", (void*)defstring_SetPdcLimit);
+  plugin_register("APIvararg_Llm_SetPdcLimit",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
 }
 } // namespace reallm
