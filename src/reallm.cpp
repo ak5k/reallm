@@ -139,7 +139,7 @@ public:
     }
     char pdcBuf[BUFSIZ];
     TrackFX_GetNamedConfigParm(tr, fx_index, "pdc", pdcBuf, BUFSIZ);
-    auto pdc = atoi(pdcBuf); // NOLINT
+    auto pdc = std::stoi(pdcBuf);
     return pdc;
   }
 
@@ -338,7 +338,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc,
 {
   char buf[BUFSIZ];
   TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
-  auto pdc_mode = atoi(buf); // NOLINT
+  auto pdc_mode = std::stoi(buf);
   int pdc = initial_pdc;
   int tr_pdc = 0;
   auto fx_count = TrackFX_GetCount(tr);
@@ -500,7 +500,7 @@ void main()
   // get pdc limit
   char buf[BUFSIZ];
   GetAudioDeviceInfo("BSIZE", buf, BUFSIZ);
-  bsize = atoi(buf); // NOLINT
+  bsize = std::stoi(buf);
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
   // build network
@@ -576,7 +576,7 @@ void main()
 
   // get previous state
   GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
-  auto state_size = atoi(buf);        // NOLINT
+  auto state_size = std::stoi(buf);
   char* state = new char[state_size]; // NOLINT
   GetProjExtState(0, "ak5k", "reallm", state, state_size);
   fx_set_prev.clear();
