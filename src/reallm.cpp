@@ -26,6 +26,7 @@ bool keep_pdc{false};
 Network<MediaTrack*> network;
 std::vector<MediaTrack*> inputTracks;
 std::vector<MediaTrack*> outputTracks;
+std::unordered_set<std::string> safed_fx_names;
 
 constexpr auto prefix_string = "llm ";
 
@@ -137,13 +138,9 @@ public:
 
   int getPdc() const
   {
-    if (tr == nullptr)
-    {
-      return 0;
-    }
     char pdcBuf[BUFSIZ];
     TrackFX_GetNamedConfigParm(tr, fx_index, "pdc", pdcBuf, BUFSIZ);
-    auto pdc = atoi(pdcBuf);
+    auto pdc = pdcBuf[0] != '\0' ? std::stoi(pdcBuf) : 0;
     return pdc;
   }
 
@@ -346,7 +343,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc,
 {
   char buf[BUFSIZ];
   TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
-  auto pdc_mode = atoi(buf); // NOLINT
+  auto pdc_mode = buf[0] != '\0' ? std::stoi(buf) : 0;
   int pdc = initial_pdc;
   int tr_pdc = 0;
   auto fx_count = TrackFX_GetCount(tr);
@@ -495,7 +492,8 @@ std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized)
 
 const char* defstring_Do =
   "void\0\0\0"
-  "Do. Call this function to run one cycle.";
+  "Do. Call this function to run one ReaLlm cycle. Use this function to run "
+  "ReaLlm on arbitrary time intervals e.g. from a deferred script.";
 
 // NOLINTNEXTLINE
 void main()
@@ -512,7 +510,7 @@ void main()
   // get pdc limit
   char buf[BUFSIZ];
   GetAudioDeviceInfo("BSIZE", buf, BUFSIZ);
-  bsize = atoi(buf);
+  bsize = buf[0] != '\0' ? std::stoi(buf) : 0;
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
   // build network
@@ -523,6 +521,7 @@ void main()
   auto num_tracks = GetNumTracks();
   for (int i = 0; i < num_tracks + 1; i++)
   {
+    // get track
     MediaTrack* tr = nullptr;
     if (i == num_tracks)
     {
@@ -539,11 +538,13 @@ void main()
       network.addLink(tr, dest);
     }
 
+    // get output tracks
     if (GetTrackNumSends(tr, 1) > 0)
     {
       outputTracks.push_back(tr);
     }
 
+    // get input tracks
     auto i_recarm = *(int*)GetSetMediaTrackInfo(tr, "I_RECARM", NULL);
     auto i_recmon = *(int*)GetSetMediaTrackInfo(tr, "I_RECMON", NULL);
     auto tr_auto_mode = GetTrackAutomationMode(tr);
@@ -552,6 +553,8 @@ void main()
     {
       inputTracks.push_back(tr);
     }
+
+    // get fx
     auto fx_count = TrackFX_GetCount(tr);
     if (i == num_tracks && include_monitoring_fx)
     {
@@ -569,6 +572,13 @@ void main()
       fx_map[g] = TrackFx(g, tr, idx);
       TrackFX_GetNamedConfigParm(tr, idx, "renamed_name", buf, BUFSIZ);
       std::string str = buf;
+      for (auto&& i : safed_fx_names)
+      {
+        if (str.find(i) != std::string::npos)
+        {
+          fx_map[g].setSafe(true);
+        }
+      }
       std::string substr = prefix_string;
       size_t pos = str.find(substr);
       if (pos != std::string::npos)
@@ -588,7 +598,7 @@ void main()
 
   // get previous state
   GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
-  auto state_size = atoi(buf);
+  auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
   char* state = new char[state_size]; // NOLINT
   GetProjExtState(0, "ak5k", "reallm", state, state_size);
   fx_set_prev.clear();
@@ -724,31 +734,44 @@ void main()
 }
 
 const char* defstring_SetPdcLimit =
-  "void\0double\0pdc_factor\0Set pdc limit as factor of buffer size.";
+  "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
 
 void SetPdcLimit(double limit)
 {
   pdc_factor = abs(limit);
 }
 
-const char* defstring_SetMonitoringFX = "void\0bool\0enable\0Set monitoring fx";
+const char* defstring_SetMonitoringFX =
+  "void\0bool\0enable\0Set to include MonitoringFX. In REAPER land this means "
+  "the fx on the master track record fx chain. Indexed as fx# + 0x1000000, "
+  "0-based.";
 
 void SetMonitoringFX(bool enable)
 {
   include_monitoring_fx = enable;
 }
 
-const char* defstring_SetClearSafe = "void\0\0\0Set clear safe";
+const char* defstring_SetClearSafe =
+  "void\0bool\0clear_manually_safed_fx\0"
+  "Set clear safe. Set clear_manually_safed_"
+  "fx = true to clear manually safed fx";
 
-void SetClearSafe()
+void SetClearSafe(bool clear_manually_safed_fx)
 {
-  for (auto&& i : fx_map)
+  if (clear_manually_safed_fx)
   {
-    i.second.setSafe(false);
+    for (auto&& i : fx_map)
+    {
+      i.second.setSafe(false);
+    }
+    fx_set_prev.clear();
+    SetProjExtState(0, "ak5k", "reallm", "");
+    SetProjExtState(0, "ak5k", "reallm_sz", "1");
   }
-  fx_set_prev.clear();
-  SetProjExtState(0, "ak5k", "reallm", "");
-  SetProjExtState(0, "ak5k", "reallm_sz", "1");
+  else
+  {
+    safed_fx_names.clear();
+  }
 }
 
 const char* defstring_SetParameterChange =
@@ -756,7 +779,9 @@ const char* defstring_SetParameterChange =
   "const char*,int,double,double\0"
   "fx_name,parameter_index,val1,val2\0"
   "Set parameter change. Set val1 = val2 to clear change. Set parameter_index "
-  "= -666 to clear all changes";
+  "= -666 to clear all changes. Use this function to set parameter changes "
+  "between values val1 and val2 for fx_name and parameter_index instead of "
+  "disabling the effect. Use custom fx names to identify individual fx.";
 
 void SetParameterChange(const char* fx_name, int parameter_index, double val1,
                         double val2)
@@ -799,9 +824,12 @@ const char* defstring_GetPaths =
   "pathStringOut_sz"
   "\0"
   "Get paths. Returns a string of the form "
-  "\"track:fx#1.fx#2...;track:fxs;...;track:fxs\" where track is "
-  "the track number and fx is the fx index. The string is truncated to "
-  "pathStringOut_sz. 1-based indexing is used.";
+  "\"start:fx#1.fx#2...;track:fxs;...;end:fxs\" where track is the track "
+  "number and fx is the fx index. The string is truncated to pathStringOut_sz. "
+  "1-based indexing is used. If no MediaTrack* start is provided, all "
+  "monitored input tracks are used. If no MediaTrack* end is provided, all "
+  "hardware output tracks are used. If includeFx is true, the fx indices are "
+  "included.";
 
 void GetPaths(bool includeFx, MediaTrack* startInOptional,
               MediaTrack* endInOptional, char* pathStringOut,
@@ -881,7 +909,8 @@ void GetPaths(bool includeFx, MediaTrack* startInOptional,
   {
     result = result.substr(0, pathStringOut_sz);
   }
-  strcpy(pathStringOut, result.c_str());
+  std::copy(result.begin(), result.end(), pathStringOut);
+  pathStringOut[result.size()] = '\0'; // don't forget the null terminator
 }
 
 const char* defstring_GetSafed =
@@ -890,7 +919,8 @@ const char* defstring_GetSafed =
   "\0"
   "Get safed. Returns a string of the form \"track:fx;track:fx;...\" where "
   "track is the track number and fx is the fx index. The string is truncated "
-  "to safeStringOut_sz. 1-based indexing is used.";
+  "to safeStringOut_sz. 1-based indexing is used. The string is followed by a "
+  "| delimited list of fx names that have been set safed.";
 
 void GetSafed(char* safeStringOut, int safeStringOut_sz)
 {
@@ -912,11 +942,36 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
   {
     result.pop_back();
   }
+  for (auto&& i : safed_fx_names)
+  {
+    result += "|";
+    result += i;
+  }
   if ((int)result.size() > safeStringOut_sz)
   {
     result = result.substr(0, safeStringOut_sz);
   }
-  strcpy(safeStringOut, result.c_str());
+  std::copy(result.begin(), result.end(), safeStringOut);
+  safeStringOut[result.size()] = '\0'; // don't forget the null terminator
+}
+
+const char* defstring_SetSafed =
+  "void\0char*,bool\0"
+  "fx_name,isSet"
+  "\0"
+  "Set safed. Set isSet = true to safe fx name. Set isSet = false to unsafe fx "
+  "name.";
+
+void SetSafed(const char* fx_name, bool isSet)
+{
+  if (isSet)
+  {
+    safed_fx_names.insert(fx_name);
+  }
+  else
+  {
+    safed_fx_names.erase(fx_name);
+  }
 }
 
 void Register()
@@ -929,6 +984,11 @@ void Register()
   plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
   plugin_register("APIvararg_Llm_Do",
                   reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
+
+  plugin_register("API_Llm_SetSafed", (void*)SetSafed);
+  plugin_register("APIdef_Llm_SetSafed", (void*)defstring_SetSafed);
+  plugin_register("APIvararg_Llm_SetSafed",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>));
 
   plugin_register("API_Llm_GetSafed", (void*)GetSafed);
   plugin_register("APIdef_Llm_GetSafed", (void*)defstring_GetSafed);
