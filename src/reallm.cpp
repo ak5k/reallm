@@ -873,11 +873,11 @@ void GetPaths(bool includeFx, MediaTrack* startInOptional,
     result.pop_back();
     result += ";";
   }
-  if (result.size() > 0)
+  if ((int)result.size() > 0)
   {
     result.pop_back();
   }
-  if (result.size() > pathStringOut_sz)
+  if ((int)result.size() > pathStringOut_sz)
   {
     result = result.substr(0, pathStringOut_sz);
   }
@@ -908,11 +908,11 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
       }
     }
   }
-  if (result.size() > 0)
+  if ((int)result.size() > 0)
   {
     result.pop_back();
   }
-  if (result.size() > safeStringOut_sz)
+  if ((int)result.size() > safeStringOut_sz)
   {
     result = result.substr(0, safeStringOut_sz);
   }
