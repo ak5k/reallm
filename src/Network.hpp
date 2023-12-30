@@ -2,54 +2,56 @@
 #include <map>
 #include <vector>
 
-template <typename Node> class Network
+template <typename Node>
+class Network
 {
-  public:
-    void addNode(Node node)
+public:
+  void addNode(Node node)
+  {
+    nodes[node] = std::vector<Node>{};
+  }
+
+  void addLink(Node fromNode, Node toNode)
+  {
+    nodes[fromNode].push_back(toNode);
+  }
+
+  void findAllPaths(Node startNode, Node endNode, std::vector<Node> path,
+                    std::vector<std::vector<Node>>& allPaths)
+  {
+    path.push_back(startNode);
+
+    if (startNode == endNode)
     {
-        nodes[node] = std::vector<Node>{};
+      allPaths.push_back(path);
     }
-
-    void addLink(Node fromNode, Node toNode)
+    else
     {
-        nodes[fromNode].push_back(toNode);
-    }
-
-    void findAllPaths(Node startNode, Node endNode, std::vector<Node> path, std::vector<std::vector<Node>> &allPaths)
-    {
-        path.push_back(startNode);
-
-        if (startNode == endNode)
+      for (Node node : nodes[startNode])
+      {
+        if (std::find(path.begin(), path.end(), node) == path.end())
         {
-            allPaths.push_back(path);
+          findAllPaths(node, endNode, path, allPaths);
         }
-        else
-        {
-            for (Node node : nodes[startNode])
-            {
-                if (std::find(path.begin(), path.end(), node) == path.end())
-                {
-                    findAllPaths(node, endNode, path, allPaths);
-                }
-            }
-        }
-
-        path.pop_back();
+      }
     }
 
-    std::vector<std::vector<Node>> getAllPaths(Node startNode, Node endNode)
-    {
-        std::vector<std::vector<Node>> allPaths;
-        std::vector<Node> path;
-        findAllPaths(startNode, endNode, path, allPaths);
-        return allPaths;
-    }
+    path.pop_back();
+  }
 
-    std::map<Node, std::vector<Node>> &getNodes()
-    {
-        return nodes;
-    }
+  std::vector<std::vector<Node>> getAllPaths(Node startNode, Node endNode)
+  {
+    std::vector<std::vector<Node>> allPaths;
+    std::vector<Node> path;
+    findAllPaths(startNode, endNode, path, allPaths);
+    return allPaths;
+  }
 
-  private:
-    std::map<Node, std::vector<Node>> nodes;
+  std::map<Node, std::vector<Node>>& getNodes()
+  {
+    return nodes;
+  }
+
+private:
+  std::map<Node, std::vector<Node>> nodes{};
 };
