@@ -100,7 +100,8 @@ if(WIN32)
   target_compile_options(
     ${PROJECT_NAME} 
       PRIVATE 
-      /W3 /WX)
+      /W3 /WX
+      /wd4996)
 else()
   target_compile_options(
     ${PROJECT_NAME}

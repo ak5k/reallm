@@ -52,6 +52,11 @@ public:
     return nodes;
   }
 
+  void clear()
+  {
+    nodes.clear();
+  }
+
 private:
   std::map<Node, std::vector<Node>> nodes{};
 };

@@ -23,6 +23,10 @@ bool shutdown{false};
 bool include_monitoring_fx{false};
 bool keep_pdc{false};
 
+Network<MediaTrack*> network;
+std::vector<MediaTrack*> inputTracks;
+std::vector<MediaTrack*> outputTracks;
+
 constexpr auto prefix_string = "llm ";
 
 struct ParameterChange
@@ -139,7 +143,7 @@ public:
     }
     char pdcBuf[BUFSIZ];
     TrackFX_GetNamedConfigParm(tr, fx_index, "pdc", pdcBuf, BUFSIZ);
-    auto pdc = std::stoi(pdcBuf);
+    auto pdc = atoi(pdcBuf);
     return pdc;
   }
 
@@ -172,6 +176,16 @@ public:
   bool getEnabled() const
   {
     return TrackFX_GetEnabled(tr, fx_index);
+  }
+
+  MediaTrack* getTrack() const
+  {
+    return tr;
+  }
+
+  int getFxIndex() const
+  {
+    return fx_index;
   }
 
 private:
@@ -332,7 +346,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc,
 {
   char buf[BUFSIZ];
   TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
-  auto pdc_mode = std::stoi(buf);
+  auto pdc_mode = atoi(buf); // NOLINT
   int pdc = initial_pdc;
   int tr_pdc = 0;
   auto fx_count = TrackFX_GetCount(tr);
@@ -479,6 +493,10 @@ std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized)
   return result;
 }
 
+const char* defstring_Do =
+  "void\0\0\0"
+  "Do. Call this function to run one cycle.";
+
 // NOLINTNEXTLINE
 void main()
 {
@@ -494,13 +512,13 @@ void main()
   // get pdc limit
   char buf[BUFSIZ];
   GetAudioDeviceInfo("BSIZE", buf, BUFSIZ);
-  bsize = std::stoi(buf);
+  bsize = atoi(buf);
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
   // build network
-  Network<MediaTrack*> network;
-  std::vector<MediaTrack*> inputTracks;
-  std::vector<MediaTrack*> outputTracks;
+  network.clear();
+  inputTracks.clear();
+  outputTracks.clear();
   std::vector<TrackFx*> possibleOrphans;
   auto num_tracks = GetNumTracks();
   for (int i = 0; i < num_tracks + 1; i++)
@@ -570,7 +588,7 @@ void main()
 
   // get previous state
   GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
-  auto state_size = std::stoi(buf);
+  auto state_size = atoi(buf);
   char* state = new char[state_size]; // NOLINT
   GetProjExtState(0, "ak5k", "reallm", state, state_size);
   fx_set_prev.clear();
@@ -775,7 +793,131 @@ void SetKeepPdc(bool enable)
   keep_pdc = enable;
 }
 
-const char* defstring_Do = "void\0\0\0Do";
+const char* defstring_GetPaths =
+  "void\0bool, MediaTrack*,MediaTrack*,char*,int\0"
+  "includeFx,startInOptional,endInOptional,pathStringOut,"
+  "pathStringOut_sz"
+  "\0"
+  "Get paths. Returns a string of the form "
+  "\"track:fx#1.fx#2...;track:fxs;...;track:fxs\" where track is "
+  "the track number and fx is the fx index. The string is truncated to "
+  "pathStringOut_sz. 1-based indexing is used.";
+
+void GetPaths(bool includeFx, MediaTrack* startInOptional,
+              MediaTrack* endInOptional, char* pathStringOut,
+              int pathStringOut_sz)
+{
+  std::string result;
+  std::vector<MediaTrack*> start_points;
+  std::vector<MediaTrack*> end_points;
+  if (startInOptional == nullptr)
+  {
+    start_points = inputTracks;
+  }
+  else
+  {
+    start_points.push_back(startInOptional);
+  }
+  if (endInOptional == nullptr)
+  {
+    end_points = outputTracks;
+  }
+  else
+  {
+    end_points.push_back(endInOptional);
+  }
+  auto paths = findAllPaths(network, start_points, end_points);
+
+  for (auto&& i : paths)
+  {
+    for (auto&& j : i)
+    {
+      auto num_track = (int)GetMediaTrackInfo_Value(j, "IP_TRACKNUMBER");
+      result += std::to_string(num_track);
+      if (includeFx)
+      {
+        auto fx_count = TrackFX_GetCount(j);
+        if (j == GetMasterTrack(NULL) && include_monitoring_fx)
+        {
+          fx_count = fx_count + TrackFX_GetRecCount(j);
+        }
+        if (fx_count > 0)
+        {
+          result += ":";
+        }
+        for (int k = 0; k < fx_count; k++)
+        {
+          auto idx = k;
+          if (j == GetMasterTrack(NULL) && include_monitoring_fx &&
+              idx >= TrackFX_GetCount(j))
+          {
+            idx = idx - TrackFX_GetCount(j) + 0x1000000;
+          }
+          char buf[BUFSIZ];
+          TrackFX_GetNamedConfigParm(j, idx, "renamed_name", buf, BUFSIZ);
+          std::string str = buf;
+          std::string prefix = prefix_string;
+          if (str.substr(0, prefix.length()) == prefix)
+          {
+            result += std::to_string(idx + 1);
+            result += ".";
+          }
+        }
+        if (fx_count > 0)
+        {
+          result.pop_back();
+        }
+      }
+      result += ",";
+    }
+    result.pop_back();
+    result += ";";
+  }
+  if (result.size() > 0)
+  {
+    result.pop_back();
+  }
+  if (result.size() > pathStringOut_sz)
+  {
+    result = result.substr(0, pathStringOut_sz);
+  }
+  strcpy(pathStringOut, result.c_str());
+}
+
+const char* defstring_GetSafed =
+  "void\0char*,int\0"
+  "safeStringOut,safeStringOut_sz"
+  "\0"
+  "Get safed. Returns a string of the form \"track:fx;track:fx;...\" where "
+  "track is the track number and fx is the fx index. The string is truncated "
+  "to safeStringOut_sz. 1-based indexing is used.";
+
+void GetSafed(char* safeStringOut, int safeStringOut_sz)
+{
+  std::string result;
+  for (auto&& i : fx_map)
+  {
+    if (i.second.getSafe())
+    {
+      if (ValidatePtr2(0, i.second.getTrack(), "MediaTrack*"))
+      {
+        auto num_track =
+          (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
+        result += std::to_string(num_track) + ":" +
+                  std::to_string(i.second.getFxIndex() + 1) + ";";
+      }
+    }
+  }
+  if (result.size() > 0)
+  {
+    result.pop_back();
+  }
+  if (result.size() > safeStringOut_sz)
+  {
+    result = result.substr(0, safeStringOut_sz);
+  }
+  strcpy(safeStringOut, result.c_str());
+}
 
 void Register()
 {
@@ -787,6 +929,16 @@ void Register()
   plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
   plugin_register("APIvararg_Llm_Do",
                   reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
+
+  plugin_register("API_Llm_GetSafed", (void*)GetSafed);
+  plugin_register("APIdef_Llm_GetSafed", (void*)defstring_GetSafed);
+  plugin_register("APIvararg_Llm_GetSafed",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>));
+
+  plugin_register("API_Llm_GetPaths", (void*)GetPaths);
+  plugin_register("APIdef_Llm_GetPaths", (void*)defstring_GetPaths);
+  plugin_register("APIvararg_Llm_GetPaths",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>));
 
   plugin_register("API_Llm_SetKeepPdc", (void*)SetKeepPdc);
   plugin_register("APIdef_Llm_SetKeepPdc", (void*)defstring_SetKeepPdc);
