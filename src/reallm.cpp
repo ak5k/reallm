@@ -578,7 +578,7 @@ void main()
   delete[] state; // NOLINT
 
   static std::unordered_set<MediaTrack*> tracks_prev;
-  if (!keep_pdc)
+  if (keep_pdc == false)
   {
     std::unordered_set<MediaTrack*> tracks;
     std::unordered_set<MediaTrack*> tracks_diff;
@@ -705,11 +705,12 @@ void main()
   // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
-const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit";
+const char* defstring_SetPdcLimit =
+  "void\0double\0pdc_factor\0Set pdc limit as factor of buffer size.";
 
-void SetPdcLimit(double pdc_factor)
+void SetPdcLimit(double limit)
 {
-  pdc_factor = abs(pdc_factor);
+  pdc_factor = abs(limit);
 }
 
 const char* defstring_SetMonitoringFX = "void\0bool\0enable\0Set monitoring fx";
@@ -728,6 +729,8 @@ void SetClearSafe()
     i.second.setSafe(false);
   }
   fx_set_prev.clear();
+  SetProjExtState(0, "ak5k", "reallm", "");
+  SetProjExtState(0, "ak5k", "reallm_sz", "1");
 }
 
 const char* defstring_SetParameterChange =
