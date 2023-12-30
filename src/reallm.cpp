@@ -606,7 +606,7 @@ void main()
   delete[] state; // NOLINT
 
   static std::unordered_set<MediaTrack*> tracks_prev;
-  if (keep_pdc == false)
+  if (!keep_pdc)
   {
     std::unordered_set<MediaTrack*> tracks;
     std::unordered_set<MediaTrack*> tracks_diff;
@@ -678,6 +678,7 @@ void main()
       if (!(*it)->getEnabled())
       {
         if (!need_undo)
+
         {
           Undo_BeginBlock();
           need_undo = true;
