@@ -15,9 +15,8 @@ REAPER_PLUGIN_DLL_EXPORT auto REAPER_PLUGIN_ENTRYPOINT(
     auto version = std::stod(GetAppVersion());
     if (version < 7.0)
     {
-      ShowConsoleMsg(
-        "RealLm requires Reaper 7.0 or later. Please update "
-        "Reaper.\n");
+      ShowConsoleMsg("RealLm requires Reaper 7.0 or later. Please update "
+                     "Reaper.\n");
       return 0;
     }
     reallm::Register();

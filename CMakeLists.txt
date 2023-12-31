@@ -144,7 +144,7 @@ install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
 )
 if(APPLE)
-  set(CPACK_GENERATOR DragNDrop)
+  set(CPACK_GENERATOR productbuild)
 elseif(WIN32)
   set(CPACK_GENERATOR NSIS)
 else()
