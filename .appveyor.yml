@@ -99,6 +99,8 @@ for:
         -DVCPKG_TARGET_TRIPLET=%ARCH%-windows-static
         -DCMAKE_TOOLCHAIN_FILE=C:\Tools\vcpkg\scripts\buildsystems\vcpkg.cmake
       - cmake --build build
+      - cd build
+      - cpack
     artifacts:
       - path: build\**\reaper_*.dll
       - path: build\*.exe
