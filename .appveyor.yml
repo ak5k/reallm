@@ -54,6 +54,7 @@ for:
       esac
     artifacts:
       - path: build/reaper_*.so
+      - path: build/*.tar.xz
 
   - matrix: { only: [ appveyor_build_worker_image: macos-catalina, appveyor_build_worker_image: macos-mojave ] }
     cache:
@@ -84,6 +85,7 @@ for:
         fi
     artifacts:
       - path: build/reaper_*.dylib
+      - path: build/*.dmg
 
   - matrix: { only: [ appveyor_build_worker_image: &windows Visual Studio 2022 ] }
 
@@ -99,6 +101,7 @@ for:
       - cmake --build build
     artifacts:
       - path: build\**\reaper_*.dll
+      - path: build\**\*.exe
       - path: build\**\reaper_*.pdb
       - path: scripts\ReaBlink_Monitor.lua
 
