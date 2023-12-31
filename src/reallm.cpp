@@ -652,6 +652,7 @@ void main()
   // disable fx
   PreventUIRefresh(num_actions);
   bool need_undo = false;
+  int automation_temp_override = 0;
   for (auto it = fx_set_to_disable.begin(); it != fx_set_to_disable.end();)
   {
     if (fx_set_prev.find(*it) == fx_set_prev.end() && !(*it)->getSafe())
@@ -660,6 +661,8 @@ void main()
       {
         Undo_BeginBlock();
         need_undo = true;
+        automation_temp_override = GetGlobalAutomationOverride();
+        SetGlobalAutomationOverride(5);
       }
       (*it)->disable();
       (*it)->disable();
@@ -678,10 +681,11 @@ void main()
       if (!(*it)->getEnabled())
       {
         if (!need_undo)
-
         {
           Undo_BeginBlock();
           need_undo = true;
+          automation_temp_override = GetGlobalAutomationOverride();
+          SetGlobalAutomationOverride(5);
         }
         (*it)->enable();
       }
@@ -711,6 +715,8 @@ void main()
       {
         Undo_BeginBlock();
         need_undo = true;
+        automation_temp_override = GetGlobalAutomationOverride();
+        SetGlobalAutomationOverride(5);
       }
       i->enable();
     }
@@ -718,6 +724,7 @@ void main()
 
   if (need_undo)
   {
+    SetGlobalAutomationOverride(automation_temp_override);
     Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
   }
   auto state_string = serializeFxSet(fx_set_to_disable);
