@@ -102,9 +102,9 @@ for:
       - cd build
       - cpack
     artifacts:
-      - path: build\**\reaper_*.dll
+      - path: build\reaper_*.dll
       - path: build\*.exe
-      - path: build\**\reaper_*.pdb
+      - path: build\reaper_*.pdb
       - path: scripts\ReaBlink_Monitor.lua
 
 
