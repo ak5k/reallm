@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 template <typename Node>
@@ -47,7 +47,7 @@ public:
     return allPaths;
   }
 
-  std::map<Node, std::vector<Node>>& getNodes()
+  std::unordered_map<Node, std::vector<Node>>& getNodes()
   {
     return nodes;
   }
@@ -58,5 +58,5 @@ public:
   }
 
 private:
-  std::map<Node, std::vector<Node>> nodes{};
+  std::unordered_map<Node, std::vector<Node>> nodes{};
 };

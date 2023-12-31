@@ -4,6 +4,7 @@
 #include <reaper_plugin_functions.h>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace reallm
@@ -194,7 +195,7 @@ private:
   std::string name;
 };
 
-std::map<GUID*, TrackFx> fx_map;
+std::unordered_map<GUID*, TrackFx> fx_map;
 std::unordered_set<TrackFx*> fx_set_prev;
 
 auto ToggleActionCallback(int command) -> int
@@ -517,7 +518,8 @@ void main()
   network.clear();
   inputTracks.clear();
   outputTracks.clear();
-  std::vector<TrackFx*> possibleOrphans;
+  static std::unordered_set<TrackFx*> possibleOrphans;
+  possibleOrphans.clear();
   auto num_tracks = GetNumTracks();
   for (int i = 0; i < num_tracks + 1; i++)
   {
@@ -583,7 +585,7 @@ void main()
       size_t pos = str.find(substr);
       if (pos != std::string::npos)
       {
-        possibleOrphans.push_back(&fx_map[g]);
+        possibleOrphans.insert(&fx_map[g]);
       }
     }
   }
@@ -608,8 +610,10 @@ void main()
   static std::unordered_set<MediaTrack*> tracks_prev;
   if (!keep_pdc)
   {
-    std::unordered_set<MediaTrack*> tracks;
-    std::unordered_set<MediaTrack*> tracks_diff;
+    static std::unordered_set<MediaTrack*> tracks;
+    tracks.clear();
+    static std::unordered_set<MediaTrack*> tracks_diff;
+    tracks_diff.clear();
     for (auto&& i : paths)
     {
       for (auto&& j : i)
@@ -637,7 +641,8 @@ void main()
     }
   }
   // calculate pdc
-  std::unordered_set<TrackFx*> fx_set_to_disable;
+  static std::unordered_set<TrackFx*> fx_set_to_disable;
+  fx_set_to_disable.clear();
   for (auto&& path : paths)
   {
     int accumulating_pdc = 0;
