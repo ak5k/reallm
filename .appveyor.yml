@@ -7,6 +7,7 @@ build_script:
     -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
     -DCMAKE_OSX_ARCHITECTURES=$ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
   - cmake --build build
+  - cd build && cpack
 
 for:
   - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1804 ] }
@@ -139,6 +140,6 @@ deploy:
   force_update: true
   auth_token:
     secure: Rk8do2Q/etdabjwIABBRdTJu1a4wYVu9Ltz8HJuC0wc3rz+hHUMGa3N7vTlsrd7z
-  artifact: /.*\.(dll|dylib|so|lua)/
+  artifact: /.*\.(dll|dylib|so|lua|exe|dmg|tar.xz)/
   on:
     APPVEYOR_REPO_TAG: true
