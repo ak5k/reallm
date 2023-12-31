@@ -40,6 +40,7 @@ Function .onInit
       Call SetOutputDir
   NotSilent:
     IntOp $0 ${SF_SELECTED} | ${SF_RO}
+
 FunctionEnd
 
 Function .onVerifyInstDir
