@@ -22,7 +22,7 @@ on run argv
           set toolbar   visible to false
           set the bounds        to { 150, 150, 714, 714 }
 
-          set reaper_plugin to "reaper_*-x86_64.dylib"
+          set reaper_plugin to "reaper_reallm-x86_64.dylib"
 
           if not exists item reaper_plugin
            -- set reaper_plugin to "reaper_*-arm64.dylib"
