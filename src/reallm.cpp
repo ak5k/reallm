@@ -662,7 +662,7 @@ void main()
         Undo_BeginBlock();
         need_undo = true;
         automation_temp_override = GetGlobalAutomationOverride();
-        SetGlobalAutomationOverride(5);
+        SetGlobalAutomationOverride(6);
       }
       (*it)->disable();
       (*it)->disable();
@@ -685,7 +685,7 @@ void main()
           Undo_BeginBlock();
           need_undo = true;
           automation_temp_override = GetGlobalAutomationOverride();
-          SetGlobalAutomationOverride(5);
+          SetGlobalAutomationOverride(6);
         }
         (*it)->enable();
       }
@@ -716,7 +716,7 @@ void main()
         Undo_BeginBlock();
         need_undo = true;
         automation_temp_override = GetGlobalAutomationOverride();
-        SetGlobalAutomationOverride(5);
+        SetGlobalAutomationOverride(6);
       }
       i->enable();
     }
@@ -759,10 +759,9 @@ void SetMonitoringFX(bool enable)
   include_monitoring_fx = enable;
 }
 
-const char* defstring_SetClearSafe =
-  "void\0bool\0clear_manually_safed_fx\0"
-  "Set clear safe. Set clear_manually_safed_"
-  "fx = true to clear manually safed fx";
+const char* defstring_SetClearSafe = "void\0bool\0clear_manually_safed_fx\0"
+                                     "Set clear safe. Set clear_manually_safed_"
+                                     "fx = true to clear manually safed fx";
 
 void SetClearSafe(bool clear_manually_safed_fx)
 {
