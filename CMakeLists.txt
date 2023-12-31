@@ -145,11 +145,12 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 if(APPLE)
-  install(TARGETS ${PROJECT_NAME}
-    COMPONENT ${PROJECT_NAME}_Apple
-    RUNTIME DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Windows .dll
-    LIBRARY DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Linux .so/macOS .dylib
-  )
+  # install(TARGETS ${PROJECT_NAME}
+  #   COMPONENT ${PROJECT_NAME}_Apple
+  #   RUNTIME DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Windows .dll
+  #   LIBRARY DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Linux .so/macOS .dylib
+  # )
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/Library/Application Support/REAPER")
   set(CPACK_COMPONENT_${PROJECT_NAME}_Apple_DISPLAY_NAME "${PROJECT_NAME}")
   set(CPACK_COMPONENTS_ALL ${PROJECT_NAME}_Apple)
   set(CPACK_GENERATOR productbuild)
