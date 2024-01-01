@@ -601,11 +601,17 @@ void main()
   // get previous state
   GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
   auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
-  char* state = new char[state_size]; // NOLINT
+  static int allocated_state_size = 0;
+  static char* state = new char[allocated_state_size]; // NOLINT
+  if (state_size > allocated_state_size)
+  {
+    delete[] state;               // NOLINT
+    state = new char[state_size]; // NOLINT
+    allocated_state_size = state_size;
+  }
   GetProjExtState(0, "ak5k", "reallm", state, state_size);
   fx_set_prev.clear();
   fx_set_prev = deserializeFxSet(state);
-  delete[] state; // NOLINT
 
   static std::unordered_set<MediaTrack*> tracks_prev;
   if (!keep_pdc)
@@ -670,7 +676,6 @@ void main()
         SetGlobalAutomationOverride(6);
       }
       (*it)->disable();
-      (*it)->disable();
       ++it;
     }
     else
@@ -733,17 +738,24 @@ void main()
     Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
   }
   auto state_string = serializeFxSet(fx_set_to_disable);
-  SetProjExtState(0, "ak5k", "reallm",
-                  serializeFxSet(fx_set_to_disable).c_str());
-  SetProjExtState(0, "ak5k", "reallm_sz",
-                  std::to_string(state_string.size() + 1).c_str());
+  if (state_string != std::string(state))
+  {
+    SetProjExtState(0, "ak5k", "reallm", state_string.c_str());
+    SetProjExtState(0, "ak5k", "reallm_sz",
+                    std::to_string(state_string.size() + 1).c_str());
+  }
+  if (shutdown)
+  {
+    allocated_state_size = 0;
+    delete[] state; // NOLINT
+  }
 
   PreventUIRefresh(-num_actions);
 
   auto end_time = time_precise();
   auto time_diff = end_time - start_time;
   (void)time_diff;
-  // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
+  ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
 const char* defstring_SetPdcLimit =
