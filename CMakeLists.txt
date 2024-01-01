@@ -146,8 +146,7 @@ install(TARGETS ${PROJECT_NAME}
 
 if(APPLE)
   set(CPACK_PACKAGING_INSTALL_PREFIX "/Library/Application Support/REAPER")
-  set(CPACK_COMPONENT_${PROJECT_NAME}_Apple_DISPLAY_NAME "${PROJECT_NAME}")
-  set(CPACK_COMPONENTS_ALL ${PROJECT_NAME}_Apple)
+  set(CPACK_COMPONENTS_ALL ${PROJECT_NAME})
   set(CPACK_GENERATOR productbuild)
 elseif(WIN32)
   set(CPACK_GENERATOR NSIS)
@@ -184,14 +183,14 @@ execute_process(
             # source
             "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
             # target
-            "${CMAKE_CURRENT_SOURCE_DIR}/readme.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt"
 )
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink
             # source
             "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
             # target
-            "${CMAKE_CURRENT_SOURCE_DIR}/license.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt"
 )
 if(WIN32)
   execute_process(COMMAND timeout /t 1 /nobreak) # Sleep for 5 seconds
@@ -199,8 +198,8 @@ else()
   execute_process(COMMAND sleep 1) # Sleep for 5 seconds
 endif()
 
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/readme.txt")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
 
 set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_NSIS_CPUBITS ${CPUBITS})
