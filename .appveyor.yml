@@ -8,7 +8,7 @@ build_script:
     -DCMAKE_OSX_ARCHITECTURES=$ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
   - cmake --build build
   - cd build 
-  - sudo cpack
+  - [ "$ARCH" == "arm64;x86_64" ] && sudo cpack && rm *.dylib
 
 for:
   - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1804 ] }
@@ -120,6 +120,9 @@ for:
 
 environment:
   matrix:
+    - job_name: macOS universal 64-bit
+      appveyor_build_worker_image: macos-bigsur
+      ARCH: arm64;x86_64
     - job_name: macOS x86 32-bit
       appveyor_build_worker_image: macos-bigsur
       ARCH: i386
