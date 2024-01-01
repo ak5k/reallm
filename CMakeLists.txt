@@ -178,11 +178,28 @@ else()
 endif()
 
 list(JOIN CPACK_PACKAGE_FILE_NAME - CPACK_PACKAGE_FILE_NAME)
+
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            # source
+            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+            # target
+            "${CMAKE_CURRENT_SOURCE_DIR}/readme.txt"
+)
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            # source
+            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+            # target
+            "${CMAKE_CURRENT_SOURCE_DIR}/license.txt"
+)
 if(WIN32)
-  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+  execute_process(COMMAND timeout /t 1 /nobreak) # Sleep for 5 seconds
 else()
-  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
+  execute_process(COMMAND sleep 1) # Sleep for 5 seconds
 endif()
+
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/readme.txt")
 
 set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
