@@ -145,11 +145,6 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 if(APPLE)
-  # install(TARGETS ${PROJECT_NAME}
-  #   COMPONENT ${PROJECT_NAME}_Apple
-  #   RUNTIME DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Windows .dll
-  #   LIBRARY DESTINATION "../Library/Application Support/REAPER/UserPlugins" # Linux .so/macOS .dylib
-  # )
   set(CPACK_PACKAGING_INSTALL_PREFIX "/Library/Application Support/REAPER")
   set(CPACK_COMPONENT_${PROJECT_NAME}_Apple_DISPLAY_NAME "${PROJECT_NAME}")
   set(CPACK_COMPONENTS_ALL ${PROJECT_NAME}_Apple)
@@ -169,11 +164,11 @@ endif()
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if(${ARCH_NAME} MATCHES "arm64")
     set(CPACK_PACKAGE_FILE_NAME
-      "${PROJECT_NAME}-${PROJECT_VERSION}-macOS-M1"
+      "${PROJECT_NAME}-${PROJECT_VERSION}-macOS-Apple"
     )
   else()
     set(CPACK_PACKAGE_FILE_NAME
-      "${PROJECT_NAME}-${PROJECT_VERSION}-macOS-Intel-${CPUBITS}-bit"
+      "${PROJECT_NAME}-${PROJECT_VERSION}-MacOSX-Intel-${CPUBITS}-bit"
     )
   endif()
 else()
