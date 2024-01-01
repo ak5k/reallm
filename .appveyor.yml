@@ -74,7 +74,7 @@ for:
         case $ARCH in
         arm64)
           DEPLOY_TARGET=11.0
-          sudo xcode-select -s /Applications/Xcode-12.3.app
+          # sudo xcode-select -s /Applications/Xcode-12.3.app
           ;;
         *)
           DEPLOY_TARGET=10.9
