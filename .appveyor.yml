@@ -72,7 +72,7 @@ for:
         # sudo xcode-select -s /Applications/Xcode-$XCODE_VERSION.app
 
         case $ARCH in
-        arm64)
+        *arm64*)
           DEPLOY_TARGET=11.0
           # sudo xcode-select -s /Applications/Xcode-12.3.app
           ;;
