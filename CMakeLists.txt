@@ -83,20 +83,23 @@ if(SWELL_FOUND)
   )
 endif()
 
-# if(WIN32)
-#   add_link_options(
-#     # Use relative path to the PDB file to avoid exposing the full path
-#     /PDBALTPATH:%_PDB%
-#   )
-# endif()
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL     ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE        ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+
+if(VCPKG_TOOLCHAIN)
+  set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+  set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+endif()
 
 add_library(${PROJECT_NAME} SHARED)
 add_subdirectory(src)
 target_link_libraries(${PROJECT_NAME} PRIVATE reaper-sdk)
 
-set(CMAKE_PROJECT_VERSION_TWEAK $ENV{BUILD_NUMBER})
-set(CMAKE_PROJECT_VERSION_COMMIT $ENV{GIT_COMMIT})
-if(NOT DEFINED CMAKE_PROJECT_VERSION_TWEAK OR CMAKE_PROJECT_VERSION_TWEAK STREQUAL "")
+if(DEFINED ENV{APPVEYOR})
+    set(CMAKE_PROJECT_VERSION_TWEAK $ENV{BUILD_NUMBER})
+    set(CMAKE_PROJECT_VERSION_COMMIT $ENV{GIT_COMMIT})
+else()
     set(CMAKE_PROJECT_VERSION_TWEAK -1)
     set(CMAKE_PROJECT_VERSION_COMMIT a)
 endif()
@@ -105,6 +108,51 @@ configure_file(
   "${PROJECT_BINARY_DIR}/config.h"
 )
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
+
+if(WIN32)
+  foreach(arg
+    CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    CMAKE_C_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_MINSIZEREL
+  )
+    # Embed debug information in the object files
+    string(REGEX REPLACE "/Z[iI]" "/Z7" ${arg} "${${arg}}")
+  endforeach()
+
+  add_compile_options(
+    # Exception handling model
+    /EHsc
+
+    # Enhance optimized debugging
+    $<$<NOT:$<CONFIG:Debug>>:/Zo>
+
+    # Eliminate duplicate strings
+    $<$<NOT:$<CONFIG:Debug>>:/GF>
+
+    # Enable function-level linking
+    $<$<NOT:$<CONFIG:Debug>>:/Gy>
+
+    # Remove unreferenced COMDAT
+    $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
+  )
+
+if(NOT CMAKE_PROJECT_VERSION_TWEAK EQUAL "1")
+  add_link_options(
+    # Remove unreferenced code
+    $<$<NOT:$<CONFIG:Debug>>:/OPT:REF>
+
+    # Remove duplicate sections
+    $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
+
+    # Use relative path to the PDB file to avoid exposing the full path
+    /PDBALTPATH:%_PDB%
+  )
+endif()
+else()
+  add_compile_options(-fsigned-char -fstack-protector-strong -fdiagnostics-color)
+endif()
+
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
@@ -155,6 +203,16 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION "${REAPER_USER_PLUGINS}" # Windows .dll
   LIBRARY DESTINATION "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
 )
+
+# Set the component as required
+set(CPACK_COMPONENT_${PROJECT_NAME}_REQUIRED ON)
+if(NOT DEFINED ENV{APPVEYOR})
+    install(
+        FILES $<TARGET_PDB_FILE:${PROJECT_NAME}>
+        COMPONENT debug-info
+        DESTINATION "${REAPER_USER_PLUGINS}"
+    )
+endif()
 
 if(APPLE)
   set(CPACK_PACKAGING_INSTALL_PREFIX "/Library/Application Support/REAPER")

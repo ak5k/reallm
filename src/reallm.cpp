@@ -595,8 +595,6 @@ void main()
     shutdown = false;
     inputTracks.clear();
   }
-  // get all paths
-  auto paths = findAllPaths(network, inputTracks, outputTracks);
 
   // get previous state
   GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
@@ -612,6 +610,9 @@ void main()
   GetProjExtState(0, "ak5k", "reallm", state, state_size);
   fx_set_prev.clear();
   fx_set_prev = deserializeFxSet(state);
+
+  // get all paths
+  auto paths = findAllPaths(network, inputTracks, outputTracks);
 
   static std::unordered_set<MediaTrack*> tracks_prev;
   if (!keep_pdc)
