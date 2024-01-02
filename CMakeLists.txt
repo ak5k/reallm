@@ -162,6 +162,7 @@ if(WIN32)
       PRIVATE 
       /W3 /WX
       )
+  target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX UNICODE)
 else()
   target_compile_options(
     ${PROJECT_NAME}

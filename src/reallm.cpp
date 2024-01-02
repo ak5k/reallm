@@ -1,14 +1,30 @@
 #include "reallm.hpp"
 #include "Network.hpp"
 #include "reaper_vararg.hpp"
+#include <algorithm>
 #include <reaper_plugin_functions.h>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
+#define STRINGIZE_DEF(x) #x
+#define STRINGIZE(x) STRINGIZE_DEF(x)
+
 namespace reallm
 {
+
+template <typename T>
+static inline T min(T a, T b)
+{
+  return a < b ? a : b;
+}
+
+template <typename T>
+static inline T max(T a, T b)
+{
+  return a > b ? a : b;
+}
 
 int command_id{0};
 bool toggle_action_state{false};
@@ -1015,12 +1031,11 @@ void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut,
   *minorOut = PROJECT_VERSION_MINOR;
   *patchOut = PROJECT_VERSION_PATCH;
   *buildOut = PROJECT_VERSION_TWEAK;
-  std::string str = PROJECT_VERSION_COMMIT;
-  auto it = str.begin();
-  auto size = commitOut_sz < (int)str.size() ? commitOut_sz : str.size();
-  std::advance(it, size);
-  std::copy(str.begin(), it, commitOut);
-  commitOut[size] = '\0'; // add null terminator
+  const char* commit = STRINGIZE(PROJECT_VERSION_COMMIT);
+  std::copy(commit, commit + min(commitOut_sz - 1, (int)strlen(commit)),
+            commitOut);
+  commitOut[min(commitOut_sz - 1, (int)strlen(commit))] =
+    '\0'; // Ensure null termination
 }
 
 void Register()
