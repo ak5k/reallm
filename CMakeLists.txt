@@ -252,7 +252,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
                 "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
                 # target
                 "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
-    set(CPACK_REBINARY_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
 endif()
 
 set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")

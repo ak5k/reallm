@@ -12,7 +12,7 @@ build_script:
   - if [ "$ARCH" == "arm64;x86_64" ]; then sudo cpack && rm *.dylib; fi
 
 for:
-  - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1804 ] }
+  - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1604 ] }
     cache:
       - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install: |-
@@ -31,8 +31,6 @@ for:
         sudo apt-get install -qq aptitude > /dev/null
         sudo aptitude install -yR ${native[@]} ${target[@]/%/:$arch} > /dev/null
       }
-
-      sudo update-alternatives --set gcc /usr/bin/gcc-7
 
       case $ARCH in
       x86_64)
@@ -57,25 +55,16 @@ for:
     artifacts:
       - path: build/reaper_*.so
 
-  - matrix: { only: [ appveyor_build_worker_image: macos-bigsur, 
-                      appveyor_build_worker_image: macos-catalina,
-                      appveyor_build_worker_image: macos-mojave,
-                       ] }
+  - matrix: { only: [ appveyor_build_worker_image: macos-catalina,
+                      appveyor_build_worker_image: macos-mojave ] }
     cache:
       # - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install:
       - |-
-        # case $ARCH in
-        # arm64)  export MACOSX_DEPLOYMENT_TARGET=11.0 XCODE_VERSION=14.1   ;;
-        # x86_64) export MACOSX_DEPLOYMENT_TARGET=10.9 XCODE_VERSION=13.2.1 ;;
-        # i386)   export MACOSX_DEPLOYMENT_TARGET=10.9 XCODE_VERSION=9.4.1  ;;
-        # esac
-        # sudo xcode-select -s /Applications/Xcode-$XCODE_VERSION.app
-
         case $ARCH in
         *arm64*)
           DEPLOY_TARGET=11.0
-          # sudo xcode-select -s /Applications/Xcode-12.3.app
+          sudo xcode-select -s /Applications/Xcode-12.3.app
           ;;
         *)
           DEPLOY_TARGET=10.9
@@ -87,6 +76,18 @@ for:
           ;;
         esac
 
+      # don't use LibXml2/SQLite3 from Mono
+      - sudo rm -r /Library/Frameworks/Mono.framework
+
+      - |-
+        if [ "$appveyor_build_worker_image" = "macos-mojave" ]; then
+          # https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
+          sudo curl -k https://curl.se/ca/cacert.pem -o /etc/ssl/cert.pem
+
+          # update to Catch2 v3
+          git -C ~/vcpkg fetch
+          git -C ~/vcpkg restore -s 50fe35a3c3ca43ffe3b436380cf563100406459a ports/catch2
+        fi
     artifacts:
       - path: build/reaper_*.dylib
       - path: build/*.pkg
@@ -117,20 +118,23 @@ environment:
   GIT_COMMIT: $(APPVEYOR_REPO_COMMIT)
 
   matrix:
+    - job_name: macOS x86 32-bit
+      appveyor_build_worker_image: macos-mojave
+      ARCH: i386
+    - job_name: Linux ARM 32-bit
+      appveyor_build_worker_image: *linux
+      ARCH: armv7l
     - job_name: Windows 64-bit
       appveyor_build_worker_image: *windows
       ARCH: x64
     - job_name: macOS universal 64-bit
-      appveyor_build_worker_image: macos-bigsur
+      appveyor_build_worker_image: macos-catalina
       ARCH: arm64;x86_64
-    - job_name: macOS x86 32-bit
-      appveyor_build_worker_image: macos-bigsur
-      ARCH: i386
     - job_name: macOS ARM 64-bit
-      appveyor_build_worker_image: macos-bigsur
+      appveyor_build_worker_image: macos-catalina
       ARCH: arm64
     - job_name: macOS x86 64-bit
-      appveyor_build_worker_image: macos-bigsur
+      appveyor_build_worker_image: macos-catalina
       ARCH: x86_64
     - job_name: Windows 32-bit
       appveyor_build_worker_image: *windows
@@ -138,9 +142,6 @@ environment:
     - job_name: Linux x86 32-bit
       appveyor_build_worker_image: *linux
       ARCH: i686
-    - job_name: Linux ARM 32-bit
-      appveyor_build_worker_image: *linux
-      ARCH: armv7l
     - job_name: Linux x86 64-bit
       appveyor_build_worker_image: *linux
       ARCH: x86_64
