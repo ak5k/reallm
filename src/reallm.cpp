@@ -608,7 +608,6 @@ void main()
 
   if (shutdown)
   {
-    shutdown = false;
     inputTracks.clear();
   }
 
@@ -656,7 +655,10 @@ void main()
     tracks_prev = tracks;
     for (auto&& i : tracks)
     {
-      TrackFX_SetNamedConfigParm(i, 0, "chain_pdc_mode", "2");
+      if (tracks_prev.find(i) == tracks_prev.end())
+      {
+        TrackFX_SetNamedConfigParm(i, 0, "chain_pdc_mode", "2");
+      }
     }
     for (auto&& i : tracks_diff)
     {
@@ -763,6 +765,7 @@ void main()
   }
   if (shutdown)
   {
+    shutdown = false;
     allocated_state_size = 0;
     delete[] state; // NOLINT
   }
