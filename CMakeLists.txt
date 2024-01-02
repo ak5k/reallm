@@ -166,7 +166,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     )
 endif()
 
-list(JOIN CPACK_PACKAGE_FILE_NAME - CPACK_PACKAGE_FILE_NAME)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink

@@ -86,13 +86,6 @@ for:
           ;;
         esac
 
-      # don't use LibXml2/SQLite3 from Mono
-      - sudo rm -r /Library/Frameworks/Mono.framework
-      - |-
-        if [ "$appveyor_build_worker_image" = "macos-mojave" ]; then
-          sudo curl -k https://curl.se/ca/cacert.pem -o /etc/ssl/cert.pem
-
-        fi
     artifacts:
       - path: build/reaper_*.dylib
       - path: build/*.pkg
@@ -110,7 +103,7 @@ for:
         -DCMAKE_TOOLCHAIN_FILE=C:\Tools\vcpkg\scripts\buildsystems\vcpkg.cmake
       - cmake --build build
       - cd build
-      - cpack
+      - if "%ARCH%" == "x64" cpack
     artifacts:
       - path: build\reaper_*.dll
       - path: build\*.exe
@@ -120,6 +113,9 @@ for:
 
 environment:
   matrix:
+    - job_name: Windows 64-bit
+      appveyor_build_worker_image: *windows
+      ARCH: x64
     - job_name: macOS universal 64-bit
       appveyor_build_worker_image: macos-bigsur
       ARCH: arm64;x86_64
@@ -132,9 +128,6 @@ environment:
     - job_name: macOS x86 64-bit
       appveyor_build_worker_image: macos-bigsur
       ARCH: x86_64
-    - job_name: Windows 64-bit
-      appveyor_build_worker_image: *windows
-      ARCH: x64
     - job_name: Windows 32-bit
       appveyor_build_worker_image: *windows
       ARCH: x86
