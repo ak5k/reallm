@@ -164,36 +164,27 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CPACK_PACKAGE_FILE_NAME 
     "${PROJECT_NAME}-${PROJECT_VERSION}-macOS"
     )
-else()
-  set(CPACK_PACKAGE_FILE_NAME
-    "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CPUBITS}"
-  )
 endif()
 
 list(JOIN CPACK_PACKAGE_FILE_NAME - CPACK_PACKAGE_FILE_NAME)
-
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-            # source
-            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-            # target
-            "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt"
-)
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-            # source
-            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-            # target
-            "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt"
-)
-if(WIN32)
-  execute_process(COMMAND timeout /t 1 /nobreak) # Sleep for 5 seconds
-else()
-  execute_process(COMMAND sleep 1) # Sleep for 5 seconds
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+                # source
+                "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+                # target
+                "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
 endif()
-
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+                # source
+                "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+                # target
+                "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
+endif()
 
 set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_NSIS_CPUBITS ${CPUBITS})
