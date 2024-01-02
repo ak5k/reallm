@@ -1,14 +1,24 @@
 cmake_minimum_required(VERSION 3.15)
 
-if(DEFINED ENV{APPVEYOR})
-    set(CMAKE_PROJECT_VERSION $ENV{APPVEYOR_REPO_TAG})
-    string(REGEX REPLACE "\"" "" CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION})
-else()
-    set(CMAKE_PROJECT_VERSION 0.0.0)
-endif()
+project(reallm VERSION 0.0.0 LANGUAGES C CXX)
 
-project(reallm VERSION ${CMAKE_PROJECT_VERSION} LANGUAGES C CXX)
-message("CMAKE_PROJECT_VERSION: ${CMAKE_PROJECT_VERSION}")
+# Find Git
+find_package(Git)
+
+# If Git was found
+if(GIT_FOUND)
+  # Get the latest git tag
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_LATEST_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  string(REGEX REPLACE "[^0-9.]" "" GIT_LATEST_TAG ${GIT_LATEST_TAG})
+  # Set the project version to the latest git tag
+  project(${PROJECT_NAME} VERSION ${GIT_LATEST_TAG} LANGUAGES C CXX)
+endif()
+message("Project version: ${PROJECT_VERSION}")
 
 if(DEFINED ENV{APPVEYOR})
     set(CMAKE_PROJECT_VERSION_TWEAK $ENV{APPVEYOR_BUILD_NUMBER})
@@ -18,7 +28,6 @@ else()
     set(CMAKE_PROJECT_VERSION_COMMIT "\"a\"")
 endif()
 message("${CMAKE_PROJECT_VERSION_TWEAK} ${CMAKE_PROJECT_VERSION_COMMIT}")
-
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
