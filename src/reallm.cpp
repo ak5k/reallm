@@ -75,11 +75,6 @@ public:
         parameter_changed = true;
       }
     }
-    if (parameter_changed)
-    {
-      return;
-    }
-    TrackFX_SetEnabled(tr, fx_index, true);
     TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
     std::string str = buf;
     std::string substr = prefix_string;
@@ -98,6 +93,11 @@ public:
     {
       TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", str.c_str());
     }
+    if (parameter_changed)
+    {
+      return;
+    }
+    TrackFX_SetEnabled(tr, fx_index, true);
   }
 
   void disable()
@@ -116,11 +116,6 @@ public:
         parameter_changed = true;
       }
     }
-    if (parameter_changed)
-    {
-      return;
-    }
-    TrackFX_SetEnabled(tr, fx_index, false);
     std::string str;
     TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
     str = buf;
@@ -135,6 +130,11 @@ public:
       TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name",
                                  (prefix + str).c_str());
     }
+    if (parameter_changed)
+    {
+      return;
+    }
+    TrackFX_SetEnabled(tr, fx_index, false);
   }
 
   int getPdc() const
