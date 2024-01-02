@@ -120,18 +120,18 @@ environment:
   REPO_TAG: $(APPVEYOR_REPO_TAG_NAME)
 
   matrix:
-    - job_name: Linux ARM 32-bit
-      appveyor_build_worker_image: *linux
-      ARCH: armv7l
     # - job_name: macOS x86 32-bit
     #   appveyor_build_worker_image: macos-mojave
     #   ARCH: i386
-    - job_name: Windows 64-bit
-      appveyor_build_worker_image: *windows
-      ARCH: x64
     - job_name: macOS universal 64-bit
       appveyor_build_worker_image: macos-monterey
       ARCH: arm64;x86_64
+    - job_name: Linux ARM 32-bit
+      appveyor_build_worker_image: *linux
+      ARCH: armv7l
+    - job_name: Windows 64-bit
+      appveyor_build_worker_image: *windows
+      ARCH: x64
     - job_name: macOS ARM 64-bit
       appveyor_build_worker_image: macos-monterey
       ARCH: arm64
