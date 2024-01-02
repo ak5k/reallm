@@ -1015,8 +1015,12 @@ void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut,
   *minorOut = PROJECT_VERSION_MINOR;
   *patchOut = PROJECT_VERSION_PATCH;
   *buildOut = PROJECT_VERSION_TWEAK;
-  std::copy(PROJECT_VERSION_COMMIT, PROJECT_VERSION_COMMIT + commitOut_sz,
-            commitOut);
+  std::string str = PROJECT_VERSION_COMMIT;
+  auto it = str.begin();
+  auto size = commitOut_sz < (int)str.size() ? commitOut_sz : str.size();
+  std::advance(it, size);
+  std::copy(str.begin(), it, commitOut);
+  commitOut[size] = '\0'; // add null terminator
 }
 
 void Register()
