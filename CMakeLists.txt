@@ -7,13 +7,6 @@ set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(BUILD_NUMBER $ENV{BUILD_NUMBER})
-configure_file(
-  "${PROJECT_SOURCE_DIR}/config.h.in"
-  "${PROJECT_BINARY_DIR}/config.h"
-)
-include_directories(${CMAKE_BINARY_DIR})
-
 # path for external 3rd party library dependencies 
 include(FetchContent)
 set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)
@@ -100,6 +93,16 @@ endif()
 add_library(${PROJECT_NAME} SHARED)
 add_subdirectory(src)
 target_link_libraries(${PROJECT_NAME} PRIVATE reaper-sdk)
+
+set(CMAKE_PROJECT_VERSION_TWEAK $ENV{BUILD_NUMBER})
+if(NOT DEFINED CMAKE_PROJECT_VERSION_TWEAK OR CMAKE_PROJECT_VERSION_TWEAK STREQUAL "")
+    set(CMAKE_PROJECT_VERSION_TWEAK -1)
+endif()
+configure_file(
+  "${PROJECT_SOURCE_DIR}/config.h.in"
+  "${PROJECT_BINARY_DIR}/config.h"
+)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 

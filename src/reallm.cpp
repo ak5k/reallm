@@ -1009,10 +1009,10 @@ const char* defstring_GetVersion =
 
 void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut)
 {
-  *majorOut = reallm_VERSION_MAJOR;
-  *minorOut = reallm_VERSION_MINOR;
-  *patchOut = reallm_VERSION_PATCH;
-  *buildOut = reallm_VERSION_BUILD;
+  *majorOut = PROJECT_VERSION_MAJOR;
+  *minorOut = PROJECT_VERSION_MINOR;
+  *patchOut = PROJECT_VERSION_PATCH;
+  *buildOut = PROJECT_VERSION_TWEAK;
 }
 
 void Register()
