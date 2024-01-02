@@ -8,9 +8,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#define STRINGIZE_DEF(x) #x
-#define STRINGIZE(x) STRINGIZE_DEF(x)
-
 namespace reallm
 {
 
@@ -1034,7 +1031,7 @@ void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut,
   *minorOut = PROJECT_VERSION_MINOR;
   *patchOut = PROJECT_VERSION_PATCH;
   *buildOut = PROJECT_VERSION_TWEAK;
-  const char* commit = STRINGIZE(PROJECT_VERSION_COMMIT);
+  const char* commit = PROJECT_VERSION_COMMIT;
   std::copy(commit, commit + min(commitOut_sz - 1, (int)strlen(commit)),
             commitOut);
   commitOut[min(commitOut_sz - 1, (int)strlen(commit))] =
