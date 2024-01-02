@@ -1,0 +1,6 @@
+// clang-format off
+#define reallm_VERSION_MAJOR @reallm_VERSION_MAJOR@
+#define reallm_VERSION_MINOR @reallm_VERSION_MINOR@
+#define reallm_VERSION_PATCH @reallm_VERSION_PATCH@
+#define reallm_VERSION_BUILD @reallm_VERSION_BUILD@
+// clang-format on

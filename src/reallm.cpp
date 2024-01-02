@@ -998,6 +998,23 @@ void SetSafed(const char* fx_name, bool isSet)
   }
 }
 
+#include "config.h"
+
+const char* defstring_GetVersion =
+  "void\0int*,int*,int*,int*\0"
+  "majorOut,minorOut,patchOut,buildOut"
+  "\0"
+  "Get version. Returns the version of the ReaLlm plugin as four integers: "
+  "major, minor, patch, build.";
+
+void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut)
+{
+  *majorOut = reallm_VERSION_MAJOR;
+  *minorOut = reallm_VERSION_MINOR;
+  *patchOut = reallm_VERSION_PATCH;
+  *buildOut = reallm_VERSION_BUILD;
+}
+
 void Register()
 {
   command_id = plugin_register("custom_action", &action);
@@ -1008,6 +1025,11 @@ void Register()
   plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
   plugin_register("APIvararg_Llm_Do",
                   reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
+
+  plugin_register("API_Llm_GetVersion", (void*)GetVersion);
+  plugin_register("APIdef_Llm_GetVersion", (void*)defstring_GetVersion);
+  plugin_register("APIvararg_Llm_GetVersion",
+                  reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>));
 
   plugin_register("API_Llm_SetSafed", (void*)SetSafed);
   plugin_register("APIdef_Llm_SetSafed", (void*)defstring_SetSafed);

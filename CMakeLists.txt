@@ -7,6 +7,13 @@ set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set(BUILD_NUMBER $ENV{BUILD_NUMBER})
+configure_file(
+  "${PROJECT_SOURCE_DIR}/config.h.in"
+  "${PROJECT_BINARY_DIR}/config.h"
+)
+include_directories(${CMAKE_BINARY_DIR})
+
 # path for external 3rd party library dependencies 
 include(FetchContent)
 set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)

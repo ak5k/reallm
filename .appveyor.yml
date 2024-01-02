@@ -6,6 +6,7 @@ build_script:
     -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake
     -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
     -DCMAKE_OSX_ARCHITECTURES=$ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
+    -DBUILD_NUMBER=$BUILD_NUMBER
   - cmake --build build
   - cd build 
   - if [ "$ARCH" == "arm64;x86_64" ]; then sudo cpack && rm *.dylib; fi
@@ -101,6 +102,7 @@ for:
       - cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
         -DVCPKG_TARGET_TRIPLET=%ARCH%-windows-static
         -DCMAKE_TOOLCHAIN_FILE=C:\Tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+        -DBUILD_NUMBER=%BUILD_NUMBER%
       - cmake --build build
       - cd build
       - if "%ARCH%" == "x64" cpack
@@ -110,8 +112,9 @@ for:
       - path: build\reaper_*.pdb
       - path: scripts\ReaBlink_Monitor.lua
 
-
 environment:
+  BUILD_NUMBER: $(APPVEYOR_BUILD_NUMBER)
+
   matrix:
     - job_name: Windows 64-bit
       appveyor_build_worker_image: *windows
