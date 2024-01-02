@@ -206,12 +206,12 @@ install(TARGETS ${PROJECT_NAME}
 
 # Set the component as required
 set(CPACK_COMPONENT_${PROJECT_NAME}_REQUIRED ON)
-if(NOT DEFINED ENV{APPVEYOR})
-    install(
-        FILES $<TARGET_PDB_FILE:${PROJECT_NAME}>
-        COMPONENT debug-info
-        DESTINATION "${REAPER_USER_PLUGINS}"
-    )
+if(WIN32)
+install(
+    FILES $<TARGET_PDB_FILE:${PROJECT_NAME}>
+    COMPONENT ${PROJECT_NAME}
+    DESTINATION "${REAPER_USER_PLUGINS}"
+)
 endif()
 
 if(APPLE)
