@@ -242,8 +242,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
                 # source
                 "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
                 # target
-                "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
-    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/link_readme.txt")
+                "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt")
 endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
     execute_process(
@@ -251,8 +251,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
                 # source
                 "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
                 # target
-                "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
-    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/link_license.txt")
+                "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
+    set(CPACK_REBINARY_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
 endif()
 
 set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
