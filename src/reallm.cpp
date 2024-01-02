@@ -1001,18 +1001,21 @@ void SetSafed(const char* fx_name, bool isSet)
 #include "config.h"
 
 const char* defstring_GetVersion =
-  "void\0int*,int*,int*,int*\0"
-  "majorOut,minorOut,patchOut,buildOut"
+  "void\0int*,int*,int*,int*,char*,int\0"
+  "majorOut,minorOut,patchOut,buildOut,commitOut,commitOut_sz"
   "\0"
-  "Get version. Returns the version of the ReaLlm plugin as four integers: "
-  "major, minor, patch, build.";
+  "Get version. Returns the version of the plugin as integers and the commit "
+  "hash as a string. The string is truncated to commitOut_sz.";
 
-void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut)
+void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut,
+                char* commitOut, int commitOut_sz)
 {
   *majorOut = PROJECT_VERSION_MAJOR;
   *minorOut = PROJECT_VERSION_MINOR;
   *patchOut = PROJECT_VERSION_PATCH;
   *buildOut = PROJECT_VERSION_TWEAK;
+  std::copy(PROJECT_VERSION_COMMIT, PROJECT_VERSION_COMMIT + commitOut_sz,
+            commitOut);
 }
 
 void Register()

@@ -114,6 +114,7 @@ for:
 
 environment:
   BUILD_NUMBER: $(APPVEYOR_BUILD_NUMBER)
+  GIT_COMMIT: $(APPVEYOR_REPO_COMMIT)
 
   matrix:
     - job_name: Windows 64-bit
