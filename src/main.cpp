@@ -19,6 +19,10 @@ REAPER_PLUGIN_DLL_EXPORT auto REAPER_PLUGIN_ENTRYPOINT(
                      "Reaper.\n");
       return 0;
     }
+    if (rec->GetFunc("Llm_Do"))
+    {
+      return 0;
+    }
     reallm::Register();
     return 1;
   }

@@ -755,7 +755,7 @@ void main()
   auto end_time = time_precise();
   auto time_diff = end_time - start_time;
   (void)time_diff;
-  ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
+  // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
 const char* defstring_SetPdcLimit =
