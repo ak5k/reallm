@@ -2,22 +2,16 @@ cmake_minimum_required(VERSION 3.15)
 
 project(reallm VERSION 0.0.0 LANGUAGES C CXX)
 
-# Find Git
 find_package(Git)
-
-# If Git was found
 if(GIT_FOUND)
-  # Get the latest git tag
   execute_process(
     COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_LATEST_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  string(REGEX REPLACE "[^0-9.]" "" GIT_LATEST_TAG ${GIT_LATEST_TAG})
-  # Set the project version to the latest git tag
   if(NOT "${GIT_LATEST_TAG}" STREQUAL "")
-    # Set the project version to the latest git tag
+  string(REGEX REPLACE "[^0-9.]" "" GIT_LATEST_TAG ${GIT_LATEST_TAG})
     project(${PROJECT_NAME} VERSION ${GIT_LATEST_TAG} LANGUAGES C CXX)
   endif()
 endif()
