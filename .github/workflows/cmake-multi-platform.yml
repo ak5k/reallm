@@ -55,8 +55,8 @@ jobs:
       # Execute tests defined by the CMake configuration
       shell: cmd
       run: |
-        if ${{matrix.arch}} == "x64" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-        if ${{matrix.arch}} == "x86" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
+        if "${{matrix.arch}}" == "x64" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+        if "${{matrix.arch}}" == "x86" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
         cmake -B ${{ github.workspace }} ^
           -G "Ninja" ^
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ^
