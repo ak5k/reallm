@@ -55,9 +55,13 @@ jobs:
       if: runner.os == 'Windows'
       working-directory: ${{ github.workspace }}
       # Execute tests defined by the CMake configuration
-      shell: cmd
+      shell: pwsh
       run: |
-        cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -S ${{ github.workspace }}
+        if ("${{ matrix.arch }}" -eq "x64") {
+          cmd /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -S ${{ github.workspace }}"
+        } elseif ("${{ matrix.arch }}" -eq "x86") {
+          cmd /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat`" && cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -S ${{ github.workspace }}"
+        }
 
     - name: Unix-like
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
