@@ -54,7 +54,8 @@ jobs:
           # brew install cmake ninja
         fi
 
-    - name: VC++ 2019 Environment
+    - name: VC++ 2022 Environment
+      if: runner.os == 'Windows'
       working-directory: ${{ github.workspace }}
       # Execute tests defined by the CMake configuration
       shell: cmd
