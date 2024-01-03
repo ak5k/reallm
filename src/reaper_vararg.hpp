@@ -16,9 +16,11 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
 
 #include <tuple>
 
-template <typename T> struct ReaScriptAPI;
+template <typename T>
+struct ReaScriptAPI;
 
-template <typename R, typename... Args> struct ReaScriptAPI<R (*)(Args...)>
+template <typename R, typename... Args>
+struct ReaScriptAPI<R (*)(Args...)>
 {
   static auto applyVarArg(R (*function)(Args...), void** argv, const int argc)
     -> const void*
