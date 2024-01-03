@@ -108,9 +108,9 @@ jobs:
         cmake -B ${{ github.workspace }} \
           -DCMAKE_BUILD_TYPE=Release \
           -S ${{ github.workspace }} \
-          -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
-          -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
+          -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}" \
+          -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET \
           -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake
         cmake --build ${{ github.workspace }} --config Release
 
