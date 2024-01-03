@@ -29,8 +29,10 @@ jobs:
           - os: windows-latest
             arch: x64
             build_type: RelWithDebInfo
+            ninja: " -G Ninja "
           - os: windows-latest
             arch: x86
+            ninja: " -G Ninja "
           - os: macos-latest
             arch: arm64;x86_64
 
@@ -41,16 +43,21 @@ jobs:
       # Some setup steps may vary depending on the operating system
       shell: bash
       run: |
-        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-          sudo apt-get update
-          sudo apt-get install -y cmake
-        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-          brew install cmake
-        fi
+        # if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+        #   sudo apt-get update
+        #   sudo apt-get install -y cmake
+        # elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+        #   brew install cmake
+        # fi
 
     - name: Configure CMake
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
-      run: cmake -B ${{ github.workspace }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }}
+      shell: bash
+      run: |
+        cmake -B ${{ github.workspace }} ${{matrix.ninja}} 
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} 
+        -S ${{ github.workspace }}
+        -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}}
 
     - name: Build
       # Build your program with the given configuration
@@ -78,6 +85,7 @@ jobs:
         name: my-artifact
         path: |
           ./reaper_*.dll
+          ./reaper_*.pdb
           ./reaper_*.exe
           ./reaper_*.pkg
           ./reaper_*.dylib
