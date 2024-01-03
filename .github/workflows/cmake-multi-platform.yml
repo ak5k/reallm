@@ -17,17 +17,22 @@ jobs:
 
     strategy:
       matrix:
-        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         # cpp_compiler: [g++, clang++]
         # c_compiler: [gcc, clang]
         build_type: [Release]
         include:
           - os: ubuntu-latest
-            my_var: value_for_ubuntu
+            arch: x64_64
+          - os: ubuntu-latest
+            arch: aarch64
           - os: windows-latest
-            my_var: value_for_windows
+            arch: x64
+            build_type: RelWithDebInfo
+          - os: windows-latest
+            arch: x86
           - os: macos-latest
-            my_var: value_for_macos
+            arch: arm64;x86_64
 
     steps:
     - uses: actions/checkout@v2
@@ -51,10 +56,21 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{ github.workspace }} --config ${{ matrix.build_type }}
 
-    - name: Test
+    - name: CTest
       working-directory: ${{ github.workspace }}
       # Execute tests defined by the CMake configuration
       run: ctest --build-config ${{ matrix.build_type }}
+
+    - name: CPack
+      working-directory: ${{ github.workspace }}
+      # Execute tests defined by the CMake configuration
+      shell: bash
+      run: |
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          cpack
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          sudo cpack
+        fi
 
     - name: Upload artifact
       uses: actions/upload-artifact@v2
