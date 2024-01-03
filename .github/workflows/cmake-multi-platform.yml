@@ -110,36 +110,32 @@ jobs:
           ./reaper_*.dylib
           ./reaper_*.so
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: true
-          prerelease: false
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: my-artifact
-          path: ./artifacts
-              
-      - name: Upload Release Asset
-        run: |
-          for file in ./artifacts/*; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file"
-              curl \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: $(file -b --mime-type $file)" \
-                --data-binary @"$file" \
-                "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
-            fi
-          done
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: my-artifact
+        path: ./artifacts
+
+    - name: Upload Release Assets
+      run: |
+        for file in ./artifacts/*; do
+          if [ -f "$file" ]; then
+            echo "Uploading $file"
+            curl \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: $(file -b --mime-type $file)" \
+              --data-binary @"$file" \
+              "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+          fi
+        done
