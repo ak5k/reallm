@@ -17,10 +17,17 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
         # cpp_compiler: [g++, clang++]
         # c_compiler: [gcc, clang]
         build_type: [Release]
+        include:
+          - os: ubuntu-latest
+            my_var: value_for_ubuntu
+          - os: windows-latest
+            my_var: value_for_windows
+          - os: macos-latest
+            my_var: value_for_macos
 
     steps:
     - uses: actions/checkout@v2
@@ -79,15 +86,17 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: my-artifact
-          path: artifacts
+          path: ./artifacts
               
       - name: Upload Release Asset
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: ./artifacts/*
-          asset_name: artifact
-          asset_content_type: application/octet-stream
+        run: |
+          for file in ./artifacts/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file"
+              curl \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: $(file -b --mime-type $file)" \
+                --data-binary @"$file" \
+                "${{ steps.create_release.outputs.upload_url }}?name=$(basename $file)"
+            fi
+          done
