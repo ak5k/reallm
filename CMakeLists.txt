@@ -16,7 +16,10 @@ if(GIT_FOUND)
   )
   string(REGEX REPLACE "[^0-9.]" "" GIT_LATEST_TAG ${GIT_LATEST_TAG})
   # Set the project version to the latest git tag
-  project(${PROJECT_NAME} VERSION ${GIT_LATEST_TAG} LANGUAGES C CXX)
+  if(NOT "${GIT_LATEST_TAG}" STREQUAL "")
+    # Set the project version to the latest git tag
+    project(${PROJECT_NAME} VERSION ${GIT_LATEST_TAG} LANGUAGES C CXX)
+  endif()
 endif()
 message("Project version: ${PROJECT_VERSION}")
 
