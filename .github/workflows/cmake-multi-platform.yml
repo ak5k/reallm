@@ -20,6 +20,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - os: macos-latest
+            arch: arm64;x86_64
           - os: ubuntu-latest
             arch: x86_64
           - os: ubuntu-latest
@@ -34,8 +36,6 @@ jobs:
           - os: windows-latest
             arch: x86
             win_build_type: Release
-          - os: macos-latest
-            arch: arm64;x86_64
 
     steps:
     - uses: actions/checkout@v2
@@ -100,7 +100,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.win_build_type }} ^
           -S ${{ github.workspace }}" ^
           -DVCPKG_TARGET_TRIPLET=${{matrix.arch}}-windows-static ^
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake
         cmake --build ${{ github.workspace }} --config ${{ matrix.win_build_type }}
 
 
@@ -113,7 +113,7 @@ jobs:
           -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}" \
           -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN \
           -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
         cmake --build ${{ github.workspace }} --config Release
 
     - name: CTest
