@@ -72,7 +72,8 @@ jobs:
       # Execute tests defined by the CMake configuration
       shell: bash
       run: |
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+        if [[ "${{ matrix.os }}" == "windows-latest" && 
+              "${{ matrix.arch }}" == "x64" ]]; then
           cpack
         elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
           sudo cpack
