@@ -63,7 +63,7 @@ jobs:
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
       if: runner.os != 'Windows'
       run: |
-        cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }} -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+        cmake -B ${{ github.workspace }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }} -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
 
     - name: Build
       # Build your program with the given configuration
