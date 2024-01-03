@@ -47,11 +47,8 @@ jobs:
           choco install ninja
         elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
           :
-          # sudo apt-get update
-          # sudo apt-get install -y cmake ninja-build
         elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
           :
-          # brew install cmake ninja
         fi
 
     - name: VC++ 2022 Environment
