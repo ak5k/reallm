@@ -6,7 +6,10 @@ on:
       - ak5k-patch-1
     # tags:
     #   - '*'
-
+env:
+  APPVEYOR: true
+  APPVEYOR_BUILD_NUMBER: ${{ github.run_number }}
+  APPVEYOR_REPO_COMMIT: ${{ github.sha }}
 
 jobs:
   build:
@@ -15,9 +18,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        cpp_compiler: [g++, clang++]
-        c_compiler: [gcc, clang]
-        build_type: [Debug, Release]
+        # cpp_compiler: [g++, clang++]
+        # c_compiler: [gcc, clang]
+        build_type: [Release]
 
     steps:
     - uses: actions/checkout@v2
@@ -34,7 +37,7 @@ jobs:
 
     - name: Configure CMake
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
-      run: cmake -B ${{ github.workspace }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }}
+      run: cmake -B ${{ github.workspace }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }}
 
     - name: Build
       # Build your program with the given configuration
