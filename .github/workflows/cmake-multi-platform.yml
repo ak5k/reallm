@@ -19,8 +19,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # cpp_compiler: [g++, clang++]
-        # c_compiler: [gcc, clang]
         build_type: [Release]
         include:
           - os: ubuntu-latest
@@ -50,10 +48,9 @@ jobs:
           :
         fi
 
-    - name: VC++ 2022 Environment
+    - name: Windows build
       if: runner.os == 'Windows'
       working-directory: ${{ github.workspace }}
-      # Execute tests defined by the CMake configuration
       shell: cmd
       run: |
         if "${{matrix.arch}}" == "x64" call "%VS_PATH%\vcvars64.bat"
@@ -61,13 +58,11 @@ jobs:
         cmake -B ${{ github.workspace }} ^
           -G "Ninja" ^
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ^
-          -DCMAKE_C_COMPILER=cl ^
-          -DCMAKE_CXX_COMPILER=cl ^
-          -S ${{ github.workspace }}"
+          -S ${{ github.workspace }}" 
         cmake --build ${{ github.workspace }} --config ${{ matrix.build_type }}
 
 
-    - name: Unix-like
+    - name: Unix-like build
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
       if: runner.os != 'Windows'
       run: |
@@ -77,18 +72,12 @@ jobs:
           -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
         cmake --build ${{ github.workspace }} --config ${{ matrix.build_type }}
 
-    # - name: Build
-    #   # Build your program with the given configuration
-    #   run: cmake --build ${{ github.workspace }} --config ${{ matrix.build_type }}
-
     - name: CTest
       working-directory: ${{ github.workspace }}
-      # Execute tests defined by the CMake configuration
       run: ctest --build-config ${{ matrix.build_type }}
 
     - name: CPack
       working-directory: ${{ github.workspace }}
-      # Execute tests defined by the CMake configuration
       shell: bash
       run: |
         if [[ "${{ matrix.os }}" == "windows-latest" && 
@@ -105,8 +94,8 @@ jobs:
         path: |
           ./reaper_*.dll
           ./reaper_*.pdb
-          ./reaper_*.exe
-          ./reaper_*.pkg
+          ./*.exe
+          ./*.pkg
           ./reaper_*.dylib
           ./reaper_*.so
 
