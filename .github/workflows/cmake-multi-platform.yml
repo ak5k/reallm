@@ -10,7 +10,7 @@ env:
   APPVEYOR: true
   APPVEYOR_BUILD_NUMBER: ${{ github.run_number }}
   APPVEYOR_REPO_COMMIT: ${{ github.sha }}
-  VS_PATH: "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build"
+  VS_PATH: "%ProgramFiles%\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build"
 
 jobs:
   build:
