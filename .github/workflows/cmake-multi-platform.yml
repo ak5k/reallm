@@ -18,23 +18,28 @@ jobs:
 
     strategy:
       matrix:
-        build_type: [Release]
         include:
           - os: ubuntu-latest
             arch: x86_64
+            build_type: Release
           - os: ubuntu-latest
             arch: aarch64
+            build_type: Release
           - os: ubuntu-latest
             arch: i686
+            build_type: Release
           - os: ubuntu-latest
             arch: armv7l
+            build_type: Release
           - os: windows-latest
             arch: x64
             build_type: RelWithDebInfo
           - os: windows-latest
             arch: x86
+            build_type: Release
           - os: macos-latest
             arch: arm64;x86_64
+            build_type: Release
 
     steps:
     - uses: actions/checkout@v2
