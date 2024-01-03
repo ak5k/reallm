@@ -43,12 +43,14 @@ jobs:
       # Some setup steps may vary depending on the operating system
       shell: bash
       run: |
-        # if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-        #   sudo apt-get update
-        #   sudo apt-get install -y cmake
-        # elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-        #   brew install cmake
-        # fi
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          choco install ninja
+        elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          # sudo apt-get update
+          # sudo apt-get install -y cmake ninja-build
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          # brew install cmake ninja
+        fi
 
     - name: Configure CMake
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
