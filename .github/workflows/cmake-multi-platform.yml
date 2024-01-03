@@ -22,16 +22,20 @@ jobs:
         build_type: [Release]
         include:
           - os: ubuntu-latest
-            arch: x64_64
+            arch: x86_64
           - os: ubuntu-latest
             arch: aarch64
-          - os: windows-latest
-            arch: x64
-            build_type: RelWithDebInfo
-          - os: windows-latest
-            arch: x86
-          - os: macos-latest
-            arch: arm64;x86_64
+          - os: ubuntu-latest
+            arch: i686
+          - os: ubuntu-latest
+            arch: armv7l
+          # - os: windows-latest
+          #   arch: x64
+          #   build_type: RelWithDebInfo
+          # - os: windows-latest
+          #   arch: x86
+          # - os: macos-latest
+          #   arch: arm64;x86_64
 
     steps:
     - uses: actions/checkout@v2
@@ -40,12 +44,48 @@ jobs:
       # Some setup steps may vary depending on the operating system
       shell: bash
       run: |
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          ARCH=${{ matrix.arch }}
+          sudo sed -i '/arch=/! s/^deb/deb [arch=amd64,i386]/' /etc/apt/sources.list
+
+          install-deps() {
+            # sudo add-apt-repository --remove "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main"
+            local arch="$1"; shift
+            local native=("$@" php-cli qemu-user-binfmt )
+            local target=()
+
+            sudo dpkg --add-architecture $arch
+            sudo apt-get update -qq
+            sudo apt-get install -qq aptitude > /dev/null
+            sudo aptitude install -yR ${native[@]} ${target[@]/%/:$arch} > /dev/null
+          }
+      
+          # sudo update-alternatives --set gcc /usr/bin/gcc-7
+
+          case $ARCH in
+          x86_64)
+            install-deps amd64
+            ;;
+          i686)
+            install-deps i386 g++-multilib
+            export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
+                   TOOLCHAIN_PREFIX=i386-linux-gnu
+            ;;
+          armv7l)
+            install-deps armhf g++-arm-linux-gnueabihf
+            export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
+                   TOOLCHAIN_PREFIX=arm-linux-gnueabihf
+            ;;
+          aarch64)
+            install-deps arm64 g++-aarch64-linux-gnu
+            export TOOLCHAIN=$(pwd)/cmake/linux-cross.cmake \
+                   TOOLCHAIN_PREFIX=aarch64-linux-gnu
+            ;;
+          esac
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
           choco install ninja
-        elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-          :
         elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-          :
+            :
         fi
 
     - name: Windows build
