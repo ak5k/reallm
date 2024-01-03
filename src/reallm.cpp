@@ -37,6 +37,7 @@ double pdc_factor{1.0};
 bool shutdown{false};
 bool include_monitoring_fx{false};
 bool keep_pdc{false};
+bool no_renaming{false};
 
 Network<MediaTrack*> network;
 std::vector<MediaTrack*> inputTracks;
@@ -89,23 +90,26 @@ public:
         parameter_changed = true;
       }
     }
-    TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
-    std::string str = buf;
-    std::string substr = prefix_string;
-    size_t pos = str.find(substr);
-    if (pos != std::string::npos)
+    if (!no_renaming)
     {
-      // The string contains the substring, so remove it
-      str.erase(pos, substr.size());
-    }
-    TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
-    if (str == buf)
-    {
-      TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", "");
-    }
-    else
-    {
-      TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", str.c_str());
+      TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
+      std::string str = buf;
+      std::string substr = prefix_string;
+      size_t pos = str.find(substr);
+      if (pos != std::string::npos)
+      {
+        // The string contains the substring, so remove it
+        str.erase(pos, substr.size());
+      }
+      TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
+      if (str == buf)
+      {
+        TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", "");
+      }
+      else
+      {
+        TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", str.c_str());
+      }
     }
     if (parameter_changed)
     {
@@ -130,19 +134,22 @@ public:
         parameter_changed = true;
       }
     }
-    std::string str;
-    TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
-    str = buf;
-    if (str.empty())
+    if (!no_renaming)
     {
-      TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
+      std::string str;
+      TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
       str = buf;
-    }
-    std::string prefix = prefix_string;
-    if (!(str.substr(0, prefix.size()) == prefix))
-    {
-      TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name",
-                                 (prefix + str).c_str());
+      if (str.empty())
+      {
+        TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
+        str = buf;
+      }
+      std::string prefix = prefix_string;
+      if (!(str.substr(0, prefix.size()) == prefix))
+      {
+        TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name",
+                                   (prefix + str).c_str());
+      }
     }
     if (parameter_changed)
     {
@@ -595,11 +602,14 @@ void main()
           fx_map[g].setSafe(true);
         }
       }
-      std::string substr = prefix_string;
-      size_t pos = str.find(substr);
-      if (pos != std::string::npos)
+      if (!no_renaming)
       {
-        possibleOrphans.insert(&fx_map[g]);
+        std::string substr = prefix_string;
+        size_t pos = str.find(substr);
+        if (pos != std::string::npos)
+        {
+          possibleOrphans.insert(&fx_map[g]);
+        }
       }
     }
   }
@@ -734,18 +744,21 @@ void main()
   // update state
   fx_set_to_disable.insert(fx_set_prev.begin(), fx_set_prev.end());
 
-  for (auto&& i : possibleOrphans)
+  if (!no_renaming)
   {
-    if (fx_set_to_disable.find(i) == fx_set_to_disable.end())
+    for (auto&& i : possibleOrphans)
     {
-      if (!need_undo)
+      if (fx_set_to_disable.find(i) == fx_set_to_disable.end())
       {
-        Undo_BeginBlock();
-        need_undo = true;
-        automation_temp_override = GetGlobalAutomationOverride();
-        SetGlobalAutomationOverride(6);
+        if (!need_undo)
+        {
+          Undo_BeginBlock();
+          need_undo = true;
+          automation_temp_override = GetGlobalAutomationOverride();
+          SetGlobalAutomationOverride(6);
+        }
+        i->enable();
       }
-      i->enable();
     }
   }
 
@@ -766,14 +779,18 @@ void main()
     shutdown = false;
     allocated_state_size = 0;
     delete[] state; // NOLINT
+    no_renaming = false;
   }
 
   PreventUIRefresh(-num_actions);
 
   auto end_time = time_precise();
   auto time_diff = end_time - start_time;
-  (void)time_diff;
-  // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
+  if (time_diff > 1)
+  {
+    no_renaming = true;
+  }
+  ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
 const char* defstring_SetPdcLimit =
