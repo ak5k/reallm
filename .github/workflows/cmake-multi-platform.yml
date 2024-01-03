@@ -3,9 +3,9 @@ name: C++ CI
 on:
   push:
     branches:
-      - ak5k-patch-1
-    # tags:
-    #   - '*'
+      - main
+    tags:
+      - '*'
 env:
   APPVEYOR: true
   APPVEYOR_BUILD_NUMBER: ${{ github.run_number }}
