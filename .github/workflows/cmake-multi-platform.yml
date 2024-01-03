@@ -68,7 +68,12 @@ jobs:
 
     - name: Configure CMake
       # Note the current configuration is for a basic C++ project. You'll need to update this for your specific needs.
-      run: cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }} -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+      run: |
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -S ${{ github.workspace }}
+        else
+          cmake -B ${{ github.workspace }} ${{matrix.ninja}} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S ${{ github.workspace }} -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+        fi
 
     - name: Build
       # Build your program with the given configuration
