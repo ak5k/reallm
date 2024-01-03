@@ -98,9 +98,10 @@ jobs:
         cmake -B ${{ github.workspace }} ^
           -G "Ninja" ^
           -DCMAKE_BUILD_TYPE=${{ matrix.win_build_type }} ^
-          -S ${{ github.workspace }}" ^
+          -S ${{ github.workspace }} ^
           -DVCPKG_TARGET_TRIPLET=${{matrix.arch}}-windows-static ^
-          -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake 
+          
         cmake --build ${{ github.workspace }} --config ${{ matrix.win_build_type }}
 
 
