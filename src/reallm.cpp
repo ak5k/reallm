@@ -586,7 +586,7 @@ void main()
       }
       auto g = TrackFX_GetFXGUID(tr, idx);
       fx_map[g] = TrackFx(g, tr, idx);
-      TrackFX_GetNamedConfigParm(tr, idx, "fx_name", buf, BUFSIZ);
+      TrackFX_GetNamedConfigParm(tr, idx, "renamed_name", buf, BUFSIZ);
       std::string str = buf;
       for (auto&& i : safed_fx_names)
       {
