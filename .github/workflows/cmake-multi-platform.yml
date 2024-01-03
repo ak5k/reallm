@@ -27,6 +27,7 @@ jobs:
 
     - name: Create Build Environment
       # Some setup steps may vary depending on the operating system
+      shell: bash
       run: |
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
           sudo apt-get update
