@@ -110,6 +110,16 @@ jobs:
           ./reaper_*.dylib
           ./reaper_*.so
 
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: my-artifact
+        path: ./artifacts
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -120,12 +130,6 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-
-    - name: Download artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: my-artifact
-        path: ./artifacts
 
     - name: Upload Release Assets
       run: |
