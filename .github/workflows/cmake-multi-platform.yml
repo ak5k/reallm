@@ -11,6 +11,7 @@ env:
   APPVEYOR_BUILD_NUMBER: ${{ github.run_number }}
   APPVEYOR_REPO_COMMIT: ${{ github.sha }}
   VS_PATH: "%ProgramFiles%\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build"
+  MACOSX_DEPLOYMENT_TARGET: 11.0
 
 jobs:
   build:
@@ -111,7 +112,7 @@ jobs:
           -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
           -DCMAKE_TOOLCHAIN_FILE=/usr/local/share/vcpkg/scripts/buildsystems/vcpkg.cmake
           -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
         cmake --build ${{ github.workspace }} --config Release
 
     - name: CTest
