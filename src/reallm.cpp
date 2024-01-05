@@ -823,7 +823,7 @@ void main()
   {
     no_renaming = true;
   }
-  ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
+  // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
 const char* defstring_SetPdcLimit =
