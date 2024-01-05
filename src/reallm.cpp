@@ -82,12 +82,16 @@ public:
       name = buf;
     }
     auto parameter_changed = false;
-    for (auto&& i : parameter_changes)
+    if (hasParameterChange)
     {
-      if (name.find(i.fx_name) != std::string::npos)
+      for (auto&& i : parameter_changes)
       {
-        TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val2);
-        parameter_changed = true;
+        if (name.find(i.fx_name) != std::string::npos)
+        {
+          TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val2);
+          hasParameterChange = false;
+          parameter_changed = true;
+        }
       }
     }
     if (!no_renaming)
@@ -111,7 +115,7 @@ public:
         TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", str.c_str());
       }
     }
-    if (parameter_changed)
+    if (hasParameterChange || parameter_changed)
     {
       return;
     }
@@ -130,8 +134,12 @@ public:
     {
       if (name.find(i.fx_name) != std::string::npos)
       {
-        TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val1);
-        parameter_changed = true;
+        if (!hasParameterChange)
+        {
+          hasParameterChange = true;
+          TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val1);
+          parameter_changed = true;
+        }
       }
     }
     if (!no_renaming)
@@ -151,7 +159,7 @@ public:
                                    (prefix + str).c_str());
       }
     }
-    if (parameter_changed)
+    if (hasParameterChange || parameter_changed)
     {
       return;
     }
@@ -207,6 +215,16 @@ public:
     return fx_index;
   }
 
+  bool getParameterChange() const
+  {
+    return hasParameterChange;
+  }
+
+  void setParameterChange(bool hasParameterChange)
+  {
+    this->hasParameterChange = hasParameterChange;
+  }
+
 private:
   GUID* g{};
   MediaTrack* tr;
@@ -214,6 +232,7 @@ private:
   bool isSafe;
   char buf[BUFSIZ];
   std::string name;
+  bool hasParameterChange{false};
 };
 
 std::unordered_map<GUID*, TrackFx> fx_map;
@@ -405,7 +424,8 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc,
       fx_map[g].setSafe(false);
     }
     else if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() &&
-             !fx_map[g].getSafe() && TrackFX_GetEnabled(tr, i))
+             !fx_map[g].getSafe() && TrackFX_GetEnabled(tr, i) &&
+             !fx_map[g].getParameterChange())
     {
       fx_map[g].setSafe(true);
       // fx_set_prev.erase(&fx_map[g]);
@@ -471,6 +491,15 @@ std::string serializeFxSet(std::unordered_set<TrackFx*>& fx_to_disable)
     {
       fx_string += "0";
     }
+    fx_string += ",";
+    if (fx->getParameterChange())
+    {
+      fx_string += "1";
+    }
+    else
+    {
+      fx_string += "0";
+    }
     // Add the TrackFx string to the result
     if (!result.empty())
     {
@@ -493,9 +522,11 @@ std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized)
     std::istringstream tokenStream(token);
     std::string guidString;
     std::string safeString;
+    std::string paramChangeString;
 
     std::getline(tokenStream, guidString, ',');
     std::getline(tokenStream, safeString, ',');
+    std::getline(tokenStream, paramChangeString, ',');
     GUID* g{nullptr};
     for (auto&& i : fx_map)
     {
@@ -503,6 +534,7 @@ std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized)
       {
         g = i.second.getGuid();
         fx_map[g].setSafe(safeString == "1");
+        fx_map[g].setParameterChange(paramChangeString == "1");
         result.insert(&fx_map[g]);
         break;
       }
@@ -537,6 +569,7 @@ void main()
 
   // build network
   network.clear();
+  fx_map.clear();
   inputTracks.clear();
   outputTracks.clear();
   static std::unordered_set<TrackFx*> possibleOrphans;
@@ -715,7 +748,7 @@ void main()
   {
     if (fx_set_to_disable.find(*it) == fx_set_to_disable.end())
     {
-      if (!(*it)->getEnabled())
+      if (!(*it)->getEnabled() || (*it)->getParameterChange())
       {
         if (!need_undo)
         {
