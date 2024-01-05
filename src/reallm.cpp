@@ -659,7 +659,8 @@ void main()
   static char* state = new char[allocated_state_size]; // NOLINT
   if (state_size > allocated_state_size)
   {
-    delete[] state;               // NOLINT
+    delete[] state; // NOLINT
+    state = nullptr;
     state = new char[state_size]; // NOLINT
     allocated_state_size = state_size;
   }
@@ -812,6 +813,7 @@ void main()
     shutdown = false;
     allocated_state_size = 0;
     delete[] state; // NOLINT
+    state = nullptr;
     no_renaming = false;
   }
 
