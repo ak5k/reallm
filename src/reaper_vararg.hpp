@@ -62,7 +62,8 @@ private:
     return std::make_tuple(
       std::is_floating_point_v<NthType<I>>
         ? *reinterpret_cast<NthType<I>*>(argv[I])
-        : (NthType<I>)reinterpret_cast<uintptr_t>(argv[I])...);
+        : (NthType<I>)reinterpret_cast<uintptr_t>(argv[I])...
+    );
   }
 };
 
