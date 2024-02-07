@@ -406,7 +406,10 @@ int CalculateTrackPdc(
   int pdc = initial_pdc;
   int tr_pdc = 0;
   auto fx_count = TrackFX_GetCount(tr);
-
+  if (reaperVersion >= 6.20)
+  {
+    pdc_mode = 1;
+  }
   if (reaperVersion >= 6.72)
   {
     TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
@@ -596,7 +599,7 @@ void main()
   bsize = largestPowerOfTwo(max(input, output));
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
-  if (reaperVersion < 6.72)
+  if (reaperVersion < 6.20)
   {
     keep_pdc = true;
   }
