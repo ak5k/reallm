@@ -116,7 +116,7 @@ environment:
   matrix:
     - job_name: macOS x86 32-bit
       appveyor_build_worker_image: macos-mojave
-      ARCH: x86
+      ARCH: i386
     - job_name: macOS universal 64-bit
       appveyor_build_worker_image: macos-catalina
       ARCH: arm64;x86_64
