@@ -596,6 +596,11 @@ void main()
   bsize = largestPowerOfTwo(max(input, output));
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
+  if (reaperVersion < 6.72)
+  {
+    keep_pdc = true;
+  }
+
   // build network
   network.clear();
   fx_map.clear();
