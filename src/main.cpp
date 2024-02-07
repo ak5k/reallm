@@ -29,6 +29,7 @@ static bool loadAPI(void* (*getFunc)(const char*))
   const ApiFunc funcs[]{
     REQUIRED_API(Audio_IsRunning),
     REQUIRED_API(GetAppVersion),
+    REQUIRED_API(GetInputOutputLatency),
     REQUIRED_API(GetGlobalAutomationOverride),
     REQUIRED_API(GetMasterTrack),
     REQUIRED_API(GetMediaTrackInfo_Value),
@@ -87,17 +88,19 @@ REAPER_PLUGIN_DLL_EXPORT auto REAPER_PLUGIN_ENTRYPOINT(
 ) -> int
 {
   (void)hInstance;
-  auto version = std::stod(GetAppVersion());
-  if (version < 5.75)
-  {
-    return 0;
-  }
   if (rec != nullptr && loadAPI(rec->GetFunc)) // (rec->GetFunc) == 0)
   {
     if (rec->GetFunc("Llm_Do"))
     {
       return 0;
     }
+
+    auto version = std::stod(GetAppVersion());
+    if (version < 5.75)
+    {
+      return 0;
+    }
+
     reallm::Register();
     return 1;
   }

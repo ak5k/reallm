@@ -21,7 +21,7 @@ void main();
 
 int pdc_limit;
 int bsize;
-double reaperVersion{std::stod(GetAppVersion())};
+double reaperVersion = 0;
 double pdc_factor{1.0};
 bool shutdown{false};
 bool include_monitoring_fx{false};
@@ -401,16 +401,18 @@ int CalculateTrackPdc(
   MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set
 )
 {
+  auto pdc_mode = 0;
   char buf[BUFSIZ];
-  TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
-  auto pdc_mode = buf[0] != '\0' ? std::stoi(buf) : 0;
-  if (reaperVersion < 6.72)
-  {
-    pdc_mode = 0;
-  }
   int pdc = initial_pdc;
   int tr_pdc = 0;
   auto fx_count = TrackFX_GetCount(tr);
+
+  if (reaperVersion >= 6.72)
+  {
+    TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
+    pdc_mode = buf[0] != '\0' ? std::stoi(buf) : 0;
+  }
+
   if (include_monitoring_fx && tr == GetMasterTrack(NULL))
   {
     fx_count = fx_count + TrackFX_GetRecCount(tr);
@@ -449,7 +451,9 @@ int CalculateTrackPdc(
       fx_map[g].setSafe(true);
       // fx_set_prev.erase(&fx_map[g]);
     }
-    if (pdc_mode == 0)
+
+    // classic pdc
+    if (pdc_mode == 0 && keep_pdc)
     {
       fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : (fx_pdc / bsize + 1) * bsize;
       if (pdc + fx_pdc > pdc_limit && !fx_map[g].getSafe())
@@ -461,7 +465,9 @@ int CalculateTrackPdc(
         pdc += fx_pdc;
       }
     }
-    if (pdc_mode == 1)
+
+    // chain pdc
+    if (pdc_mode == 1 && keep_pdc)
     {
       tr_pdc += fx_pdc;
       auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
@@ -471,7 +477,9 @@ int CalculateTrackPdc(
         fx_set.insert(&fx_map[g]);
       }
     }
-    if (pdc_mode == 2)
+
+    // no pdc
+    if (pdc_mode == 2 || (!keep_pdc && pdc_mode == 1 && reaperVersion >= 6.72))
     {
       pdc += fx_pdc;
       if (pdc > pdc_limit && !fx_map[g].getSafe())
@@ -582,7 +590,8 @@ void main()
 
   // get pdc limit
   char buf[BUFSIZ];
-  int input, output;
+  int input = 0;
+  int output = 0;
   GetInputOutputLatency(&input, &output);
   bsize = largestPowerOfTwo(max(input, output));
   pdc_limit = (int)(bsize * abs(pdc_factor));
@@ -1117,6 +1126,8 @@ void GetVersion(
 
 void Register()
 {
+  reaperVersion = std::stod(GetAppVersion());
+
   command_id = plugin_register("custom_action", &action);
   plugin_register("toggleaction", (void*)ToggleActionCallback);
   plugin_register("hookcommand2", (void*)OnAction);
