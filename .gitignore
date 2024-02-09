@@ -1,6 +1,6 @@
 .vscode/*
 .vs/*
-!.vscode/launch.json
+.vscode/launch.json
 **/.DS_Store
 /*build
 /lib/*build
