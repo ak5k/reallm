@@ -60,10 +60,11 @@ static inline T max(T a, T b)
 
 struct ParameterChange
 {
-  ParameterChange(
-    const char* fx_name, int parameter_index, double val1, double val2
-  )
-    : fx_name(fx_name), parameter_index(parameter_index), val1(val1), val2(val2)
+  ParameterChange(const char* fx_name, int parameter_index, double val1, double val2)
+    : fx_name(fx_name)
+    , parameter_index(parameter_index)
+    , val1(val1)
+    , val2(val2)
   {
   }
 
@@ -78,12 +79,21 @@ std::vector<ParameterChange> parameter_changes;
 class TrackFx
 {
 public:
-  TrackFx() : g(nullptr), tr(nullptr), fx_index(-1), isSafe(false), buf{}
+  TrackFx()
+    : g(nullptr)
+    , tr(nullptr)
+    , fx_index(-1)
+    , isSafe(false)
+    , buf{}
   {
   }
 
   TrackFx(GUID* g, MediaTrack* tr, int fx_index)
-    : g(g), tr(tr), fx_index(fx_index), isSafe(false), buf{}
+    : g(g)
+    , tr(tr)
+    , fx_index(fx_index)
+    , isSafe(false)
+    , buf{}
   {
   }
 
@@ -168,9 +178,7 @@ public:
       std::string prefix = prefix_string;
       if (!(str.substr(0, prefix.size()) == prefix))
       {
-        TrackFX_SetNamedConfigParm(
-          tr, fx_index, "renamed_name", (prefix + str).c_str()
-        );
+        TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", (prefix + str).c_str());
       }
     }
     if (hasParameterChange || parameter_changed)
@@ -265,9 +273,7 @@ auto ToggleActionCallback(int command) -> int
   return 0;
 }
 
-auto OnAction(
-  KbdSectionInfo* sec, int command, int val, int valhw, int relmode, HWND hwnd
-) -> bool
+auto OnAction(KbdSectionInfo* sec, int command, int val, int valhw, int relmode, HWND hwnd) -> bool
 {
   // treat unused variables 'pedantically'
   (void)sec;
@@ -313,10 +319,8 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
   for (int j = 0; j < numSends; j++)
   {
     MediaTrack* destinationTrack{nullptr};
-    destinationTrack = (MediaTrack*)(UINT_PTR
-    )GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
-    bool isSendMuted =
-      (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
+    destinationTrack = (MediaTrack*)(UINT_PTR)GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
+    bool isSendMuted = (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
     if (!isSendMuted)
     {
       destinationTracks.push_back(destinationTrack);
@@ -324,8 +328,7 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
   }
 
   // Check if the track has a parent track
-  MediaTrack* parentTrack =
-    (MediaTrack*)GetSetMediaTrackInfo(sourceTrack, "P_PARTRACK", NULL);
+  MediaTrack* parentTrack = (MediaTrack*)GetSetMediaTrackInfo(sourceTrack, "P_PARTRACK", NULL);
   if (parentTrack != NULL)
   {
     // Check if the parent send is active
@@ -349,10 +352,8 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
 }
 
 void dfs(
-  Network<MediaTrack*>& network, MediaTrack* currentTrack,
-  MediaTrack* targetTrack, std::vector<MediaTrack*>& visited,
-  std::vector<MediaTrack*>& path,
-  std::vector<std::vector<MediaTrack*>>& allPaths
+  Network<MediaTrack*>& network, MediaTrack* currentTrack, MediaTrack* targetTrack, std::vector<MediaTrack*>& visited,
+  std::vector<MediaTrack*>& path, std::vector<std::vector<MediaTrack*>>& allPaths
 )
 {
   visited.push_back(currentTrack);
@@ -377,8 +378,7 @@ void dfs(
 }
 
 std::vector<std::vector<MediaTrack*>> findAllPaths(
-  Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks,
-  std::vector<MediaTrack*>& outputTracks
+  Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks, std::vector<MediaTrack*>& outputTracks
 )
 {
   std::vector<std::vector<MediaTrack*>> allPaths;
@@ -397,9 +397,7 @@ std::vector<std::vector<MediaTrack*>> findAllPaths(
 }
 
 // NOLINTNEXTLINE
-int CalculateTrackPdc(
-  MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set
-)
+int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set)
 {
   auto pdc_mode = 0;
   char buf[BUFSIZ];
@@ -574,10 +572,9 @@ std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized)
   return result;
 }
 
-const char* defstring_Do =
-  "void\0\0\0"
-  "Do. Call this function to run one ReaLlm cycle. Use this function to run "
-  "ReaLlm on arbitrary time intervals e.g. from a deferred script.";
+const char* defstring_Do = "void\0\0\0"
+                           "Do. Call this function to run one ReaLlm cycle. Use this function to run "
+                           "ReaLlm on arbitrary time intervals e.g. from a deferred script.";
 
 // NOLINTNEXTLINE
 void main()
@@ -597,6 +594,8 @@ void main()
   int output = 0;
   GetInputOutputLatency(&input, &output);
   bsize = largestPowerOfTwo(max(input, output));
+  if (bsize == 0)
+    return;
   pdc_limit = (int)(bsize * abs(pdc_factor));
 
   if (reaperVersion < 6.20)
@@ -750,8 +749,7 @@ void main()
     int accumulating_pdc = 0;
     for (auto&& tr : path)
     {
-      accumulating_pdc =
-        CalculateTrackPdc(tr, accumulating_pdc, fx_set_to_disable);
+      accumulating_pdc = CalculateTrackPdc(tr, accumulating_pdc, fx_set_to_disable);
     }
   }
 
@@ -840,9 +838,7 @@ void main()
   if (state_string != std::string(state))
   {
     SetProjExtState(0, "ak5k", "reallm", state_string.c_str());
-    SetProjExtState(
-      0, "ak5k", "reallm_sz", std::to_string(state_string.size() + 1).c_str()
-    );
+    SetProjExtState(0, "ak5k", "reallm_sz", std::to_string(state_string.size() + 1).c_str());
   }
   if (shutdown)
   {
@@ -864,18 +860,16 @@ void main()
   // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
-const char* defstring_SetPdcLimit =
-  "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
+const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
 
 void SetPdcLimit(double limit)
 {
   pdc_factor = abs(limit);
 }
 
-const char* defstring_SetMonitoringFX =
-  "void\0bool\0enable\0Set to include MonitoringFX. In REAPER land this means "
-  "the fx on the master track record fx chain. Indexed as fx# + 0x1000000, "
-  "0-based.";
+const char* defstring_SetMonitoringFX = "void\0bool\0enable\0Set to include MonitoringFX. In REAPER land this means "
+                                        "the fx on the master track record fx chain. Indexed as fx# + 0x1000000, "
+                                        "0-based.";
 
 void SetMonitoringFX(bool enable)
 {
@@ -904,18 +898,15 @@ void SetClearSafe(bool clear_manually_safed_fx)
   }
 }
 
-const char* defstring_SetParameterChange =
-  "void\0"
-  "const char*,int,double,double\0"
-  "fx_name,parameter_index,val1,val2\0"
-  "Set parameter change. Set val1 = val2 to clear change. Set parameter_index "
-  "= -666 to clear all changes. Use this function to set parameter changes "
-  "between values val1 and val2 for fx_name and parameter_index instead of "
-  "disabling the effect. Use custom fx names to identify individual fx.";
+const char* defstring_SetParameterChange = "void\0"
+                                           "const char*,int,double,double\0"
+                                           "fx_name,parameter_index,val1,val2\0"
+                                           "Set parameter change. Set val1 = val2 to clear change. Set parameter_index "
+                                           "= -666 to clear all changes. Use this function to set parameter changes "
+                                           "between values val1 and val2 for fx_name and parameter_index instead of "
+                                           "disabling the effect. Use custom fx names to identify individual fx.";
 
-void SetParameterChange(
-  const char* fx_name, int parameter_index, double val1, double val2
-)
+void SetParameterChange(const char* fx_name, int parameter_index, double val1, double val2)
 {
   if (val1 == val2)
   {
@@ -938,9 +929,7 @@ void SetParameterChange(
     parameter_changes.clear();
     return;
   }
-  parameter_changes.emplace_back(
-    ParameterChange(fx_name, parameter_index, val1, val2)
-  );
+  parameter_changes.emplace_back(ParameterChange(fx_name, parameter_index, val1, val2));
 }
 
 const char* defstring_SetKeepPdc = "void\0bool\0enable\0Set keep pdc";
@@ -950,22 +939,20 @@ void SetKeepPdc(bool enable)
   keep_pdc = enable;
 }
 
-const char* defstring_GetPaths =
-  "void\0bool, MediaTrack*,MediaTrack*,char*,int\0"
-  "includeFx,startInOptional,endInOptional,pathStringOut,"
-  "pathStringOut_sz"
-  "\0"
-  "Get paths. Returns a string of the form "
-  "\"start:fx#1.fx#2...;track:fxs;...;end:fxs\" where track is the track "
-  "number and fx is the fx index. The string is truncated to pathStringOut_sz. "
-  "1-based indexing is used. If no MediaTrack* start is provided, all "
-  "monitored input tracks are used. If no MediaTrack* end is provided, all "
-  "hardware output tracks are used. If includeFx is true, the fx indices are "
-  "included.";
+const char* defstring_GetPaths = "void\0bool, MediaTrack*,MediaTrack*,char*,int\0"
+                                 "includeFx,startInOptional,endInOptional,pathStringOut,"
+                                 "pathStringOut_sz"
+                                 "\0"
+                                 "Get paths. Returns a string of the form "
+                                 "\"start:fx#1.fx#2...;track:fxs;...;end:fxs\" where track is the track "
+                                 "number and fx is the fx index. The string is truncated to pathStringOut_sz. "
+                                 "1-based indexing is used. If no MediaTrack* start is provided, all "
+                                 "monitored input tracks are used. If no MediaTrack* end is provided, all "
+                                 "hardware output tracks are used. If includeFx is true, the fx indices are "
+                                 "included.";
 
 void GetPaths(
-  bool includeFx, MediaTrack* startInOptional, MediaTrack* endInOptional,
-  char* pathStringOut, int pathStringOut_sz
+  bool includeFx, MediaTrack* startInOptional, MediaTrack* endInOptional, char* pathStringOut, int pathStringOut_sz
 )
 {
   std::string result;
@@ -1045,14 +1032,13 @@ void GetPaths(
   pathStringOut[result.size()] = '\0'; // don't forget the null terminator
 }
 
-const char* defstring_GetSafed =
-  "void\0char*,int\0"
-  "safeStringOut,safeStringOut_sz"
-  "\0"
-  "Get safed. Returns a string of the form \"track:fx;track:fx;...\" where "
-  "track is the track number and fx is the fx index. The string is truncated "
-  "to safeStringOut_sz. 1-based indexing is used. The string is followed by a "
-  "| delimited list of fx names that have been set safed.";
+const char* defstring_GetSafed = "void\0char*,int\0"
+                                 "safeStringOut,safeStringOut_sz"
+                                 "\0"
+                                 "Get safed. Returns a string of the form \"track:fx;track:fx;...\" where "
+                                 "track is the track number and fx is the fx index. The string is truncated "
+                                 "to safeStringOut_sz. 1-based indexing is used. The string is followed by a "
+                                 "| delimited list of fx names that have been set safed.";
 
 void GetSafed(char* safeStringOut, int safeStringOut_sz)
 {
@@ -1063,10 +1049,8 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
     {
       if (ValidatePtr2(0, i.second.getTrack(), "MediaTrack*"))
       {
-        auto num_track =
-          (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
-        result += std::to_string(num_track) + ":" +
-                  std::to_string(i.second.getFxIndex() + 1) + ";";
+        auto num_track = (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
+        result += std::to_string(num_track) + ":" + std::to_string(i.second.getFxIndex() + 1) + ";";
       }
     }
   }
@@ -1087,12 +1071,11 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
   safeStringOut[result.size()] = '\0'; // don't forget the null terminator
 }
 
-const char* defstring_SetSafed =
-  "void\0char*,bool\0"
-  "fx_name,isSet"
-  "\0"
-  "Set safed. Set isSet = true to safe fx name. Set isSet = false to unsafe fx "
-  "name.";
+const char* defstring_SetSafed = "void\0char*,bool\0"
+                                 "fx_name,isSet"
+                                 "\0"
+                                 "Set safed. Set isSet = true to safe fx name. Set isSet = false to unsafe fx "
+                                 "name.";
 
 void SetSafed(const char* fx_name, bool isSet)
 {
@@ -1108,28 +1091,21 @@ void SetSafed(const char* fx_name, bool isSet)
 
 #include "config.h"
 
-const char* defstring_GetVersion =
-  "void\0int*,int*,int*,int*,char*,int\0"
-  "majorOut,minorOut,patchOut,buildOut,commitOut,commitOut_sz"
-  "\0"
-  "Get version. Returns the version of the plugin as integers and the commit "
-  "hash as a string. The string is truncated to commitOut_sz.";
+const char* defstring_GetVersion = "void\0int*,int*,int*,int*,char*,int\0"
+                                   "majorOut,minorOut,patchOut,buildOut,commitOut,commitOut_sz"
+                                   "\0"
+                                   "Get version. Returns the version of the plugin as integers and the commit "
+                                   "hash as a string. The string is truncated to commitOut_sz.";
 
-void GetVersion(
-  int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut,
-  int commitOut_sz
-)
+void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut, int commitOut_sz)
 {
   *majorOut = PROJECT_VERSION_MAJOR;
   *minorOut = PROJECT_VERSION_MINOR;
   *patchOut = PROJECT_VERSION_PATCH;
   *buildOut = PROJECT_VERSION_TWEAK;
   const char* commit = PROJECT_VERSION_COMMIT;
-  std::copy(
-    commit, commit + min(commitOut_sz - 1, (int)strlen(commit)), commitOut
-  );
-  commitOut[min(commitOut_sz - 1, (int)strlen(commit))] =
-    '\0'; // Ensure null termination
+  std::copy(commit, commit + min(commitOut_sz - 1, (int)strlen(commit)), commitOut);
+  commitOut[min(commitOut_sz - 1, (int)strlen(commit))] = '\0'; // Ensure null termination
 }
 
 void Register()
@@ -1142,75 +1118,44 @@ void Register()
 
   plugin_register("API_Llm_Do", (void*)main);
   plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
-  plugin_register(
-    "APIvararg_Llm_Do", reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>)
-  );
+  plugin_register("APIvararg_Llm_Do", reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
 
   plugin_register("API_Llm_GetVersion", (void*)GetVersion);
   plugin_register("APIdef_Llm_GetVersion", (void*)defstring_GetVersion);
-  plugin_register(
-    "APIvararg_Llm_GetVersion",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>)
-  );
+  plugin_register("APIvararg_Llm_GetVersion", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>));
 
   plugin_register("API_Llm_SetSafed", (void*)SetSafed);
   plugin_register("APIdef_Llm_SetSafed", (void*)defstring_SetSafed);
-  plugin_register(
-    "APIvararg_Llm_SetSafed",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>)
-  );
+  plugin_register("APIvararg_Llm_SetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>));
 
   plugin_register("API_Llm_GetSafed", (void*)GetSafed);
   plugin_register("APIdef_Llm_GetSafed", (void*)defstring_GetSafed);
-  plugin_register(
-    "APIvararg_Llm_GetSafed",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>)
-  );
+  plugin_register("APIvararg_Llm_GetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>));
 
   plugin_register("API_Llm_GetPaths", (void*)GetPaths);
   plugin_register("APIdef_Llm_GetPaths", (void*)defstring_GetPaths);
-  plugin_register(
-    "APIvararg_Llm_GetPaths",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>)
-  );
+  plugin_register("APIvararg_Llm_GetPaths", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>));
 
   plugin_register("API_Llm_SetKeepPdc", (void*)SetKeepPdc);
   plugin_register("APIdef_Llm_SetKeepPdc", (void*)defstring_SetKeepPdc);
-  plugin_register(
-    "APIvararg_Llm_SetKeepPdc",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>)
-  );
+  plugin_register("APIvararg_Llm_SetKeepPdc", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>));
 
   plugin_register("API_Llm_SetParameterChange", (void*)SetParameterChange);
+  plugin_register("APIdef_Llm_SetParameterChange", (void*)defstring_SetParameterChange);
   plugin_register(
-    "APIdef_Llm_SetParameterChange", (void*)defstring_SetParameterChange
-  );
-  plugin_register(
-    "APIvararg_Llm_SetParameterChange",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>)
+    "APIvararg_Llm_SetParameterChange", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>)
   );
 
   plugin_register("API_Llm_SetClearSafe", (void*)SetClearSafe);
   plugin_register("APIdef_Llm_SetClearSafe", (void*)defstring_SetClearSafe);
-  plugin_register(
-    "APIvararg_Llm_SetClearSafe",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>)
-  );
+  plugin_register("APIvararg_Llm_SetClearSafe", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>));
 
   plugin_register("API_Llm_SetMonitoringFX", (void*)SetMonitoringFX);
-  plugin_register(
-    "APIdef_Llm_SetMonitoringFX", (void*)defstring_SetMonitoringFX
-  );
-  plugin_register(
-    "APIvararg_Llm_SetMonitoringFX",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>)
-  );
+  plugin_register("APIdef_Llm_SetMonitoringFX", (void*)defstring_SetMonitoringFX);
+  plugin_register("APIvararg_Llm_SetMonitoringFX", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>));
 
   plugin_register("API_Llm_SetPdcLimit", (void*)SetPdcLimit);
   plugin_register("APIdef_Llm_SetPdcLimit", (void*)defstring_SetPdcLimit);
-  plugin_register(
-    "APIvararg_Llm_SetPdcLimit",
-    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>)
-  );
+  plugin_register("APIvararg_Llm_SetPdcLimit", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
 }
 } // namespace reallm
