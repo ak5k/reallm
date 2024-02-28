@@ -681,12 +681,12 @@ void main()
     // get previous state
     GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
     auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
-    static std::vector<char> state;
+    static std::string state;
     if (state_size > state.size())
         state.resize(state_size);
-    GetProjExtState(0, "ak5k", "reallm", state.data(), state_size);
+    GetProjExtState(0, "ak5k", "reallm", &state[0], state_size);
     fx_set_prev.clear();
-    fx_set_prev = deserializeFxSet({state.begin(), state.end()});
+    fx_set_prev = deserializeFxSet(state);
 
     // get all paths
     auto paths = findAllPaths(network, inputTracks, outputTracks);
