@@ -663,21 +663,6 @@ void main()
     if (shutdown)
         inputTracks.clear();
 
-    // // get previous state
-    // GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
-    // auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
-    // static int allocated_state_size = 0;
-    // static char* state = new char[allocated_state_size]; // NOLINT
-    // if (state_size > allocated_state_size)
-    // {
-    //     delete[] state; // NOLINT
-    //     state = nullptr;
-    //     state = new char[state_size]; // NOLINT
-    //     allocated_state_size = state_size;
-    // }
-    // GetProjExtState(0, "ak5k", "reallm", state, state_size);
-    // fx_set_prev.clear();
-    // fx_set_prev = deserializeFxSet(state);
     // get previous state
     GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
     auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
