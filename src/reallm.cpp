@@ -667,8 +667,9 @@ void main()
     GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
     auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
     static std::string state;
-    if (state_size > (int)state.size())
-        state.resize(state_size);
+    state.clear();
+    state.resize(state_size);
+
     GetProjExtState(0, "ak5k", "reallm", &state[0], state_size);
     fx_set_prev.clear();
     fx_set_prev = deserializeFxSet(state);
@@ -753,7 +754,8 @@ void main()
                     automation_temp_override = GetGlobalAutomationOverride();
                     SetGlobalAutomationOverride(6);
                 }
-                (*it)->enable();
+                if (!(*it)->getSafe())
+                    (*it)->enable();
             }
             if (!(*it)->getSafe())
                 it = fx_set_prev.erase(it);
