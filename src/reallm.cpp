@@ -668,7 +668,7 @@ void main()
     auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
     static std::string state;
     state.clear();
-    if (state_size != state.size())
+    if (state_size != (int)state.size())
         state.resize(state_size);
 
     GetProjExtState(0, "ak5k", "reallm", &state[0], state_size);
