@@ -668,7 +668,8 @@ void main()
     auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
     static std::string state;
     state.clear();
-    state.resize(state_size);
+    if (state_size != state.size())
+        state.resize(state_size);
 
     GetProjExtState(0, "ak5k", "reallm", &state[0], state_size);
     fx_set_prev.clear();
@@ -794,17 +795,14 @@ void main()
         SetGlobalAutomationOverride(automation_temp_override);
         Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
     }
-    auto state_string = serializeFxSet(fx_set_to_disable);
-    if (state_string != std::string(state.begin(), state.end()))
-    {
-        SetProjExtState(0, "ak5k", "reallm", state_string.c_str());
-        SetProjExtState(
-            0,
-            "ak5k",
-            "reallm_sz",
-            std::to_string(state_string.size() + 1).c_str()
-        );
-    }
+
+    // store state
+    state = serializeFxSet(fx_set_to_disable);
+    SetProjExtState(0, "ak5k", "reallm", state.c_str());
+    SetProjExtState(
+        0, "ak5k", "reallm_sz", std::to_string(state.size()).c_str()
+    );
+
     if (shutdown)
     {
         shutdown = false;
