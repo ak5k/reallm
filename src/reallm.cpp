@@ -417,7 +417,7 @@ int CalculateTrackPdc(
     auto fx_count = TrackFX_GetCount(tr);
     if (reaperVersion >= 6.20)
         pdc_mode = 1;
-    if (reaperVersion >= 6.72)
+    if (reaperVersion >= 7.06)
     {
         TrackFX_GetNamedConfigParm(tr, 0, "chain_pdc_mode", buf, BUFSIZ);
         pdc_mode = buf[0] != '\0' ? std::stoi(buf) : 0;
