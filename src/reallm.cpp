@@ -336,7 +336,7 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
     if (parentTrack != NULL)
     {
         // Check if the parent send is active
-        if (*(bool*)GetSetMediaTrackInfo(parentTrack, "B_MAINSEND", NULL))
+        if (*(bool*)GetSetMediaTrackInfo(sourceTrack, "B_MAINSEND", NULL))
             destinationTracks.push_back(parentTrack);
     }
     else
