@@ -1,4 +1,8 @@
+---
 version: "{build}-{branch}"
+
+# before_build:
+#   - git submodule update --init --depth 1
 
 build_script:
   - export VCPKG_OVERLAY_TRIPLETS=cmake/vcpkg-triplets
@@ -6,31 +10,48 @@ build_script:
     -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake
     -DVCPKG_TARGET_TRIPLET=arch-env -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$TOOLCHAIN
     -DCMAKE_OSX_ARCHITECTURES=$ARCH -DCMAKE_OSX_DEPLOYMENT_TARGET=$DEPLOY_TARGET
+    # -DRUNTIME_OPENSSL=YES
   - cmake --build build
-  - cd build 
-  - if [ "$ARCH" == "arm64;x86_64" ]; then sudo cpack && rm *.dylib; fi
+
+# test_script:
+#   - sh: '[[ "$ARCH" = arm64 ]] || cmake --build build --target test'
+#   - cmd: 'if NOT "%ARCH%" == "arm64ec" cmake --build build --target test'
 
 for:
   - matrix: { only: [ appveyor_build_worker_image: &linux Ubuntu1804 ] }
     cache:
       - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install: |-
-      # set -e
+      set -e
 
       sudo sed -i '/arch=/! s/^deb/deb [arch=amd64,i386]/' /etc/apt/sources.list
+      awk '
+      $3 !~ /ubuntu\.com/ { next }
+      $1 == "deb" {
+        $2 = "[arch=armhf,arm64]";
+        $3 = "http://ports.ubuntu.com/ubuntu-ports/"
+      } 1' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list > /dev/null
+      # sudo sed -i 's/apt.postgresql.org/apt-archive.postgresql.org/' /etc/apt/sources.list
+
+      # downgrade Catch2 to 3.3.1 for successfully compiling with GCC 7
+      git -C ~/vcpkg fetch origin b28cddc45f5832fb46afaab11d61c9ccce50470a
+      git -C ~/vcpkg restore -s b28cddc45f5832fb46afaab11d61c9ccce50470a ports/catch2
 
       install-deps() {
-        # sudo add-apt-repository --remove "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main"
         local arch="$1"; shift
-        local native=("$@" php-cli qemu-user-binfmt )
-        local target=()
+        local native=("$@" php-cli qemu-user-binfmt)
+        local target=(
+          libboost-dev libcurl4-openssl-dev libsqlite3-dev libssl-dev
+          libxml2-dev zlib1g-dev
+        )
 
         sudo dpkg --add-architecture $arch
         sudo apt-get update -qq
         sudo apt-get install -qq aptitude > /dev/null
         sudo aptitude install -yR ${native[@]} ${target[@]/%/:$arch} > /dev/null
+        sudo aptitude install -yR ${native[@]} > /dev/null
       }
-      
+
       sudo update-alternatives --set gcc /usr/bin/gcc-7
       sudo apt-get install -qq --allow-downgrades libstdc++6=8.4.0-1ubuntu1~18.04 > /dev/null
 
@@ -57,17 +78,15 @@ for:
     artifacts:
       - path: build/reaper_*.so
 
-  - matrix: { only: [ appveyor_build_worker_image: macos-catalina,
-                      appveyor_build_worker_image: macos-monterey,
-                      appveyor_build_worker_image: macos-mojave ] }
+  - matrix: { only: [ appveyor_build_worker_image: macos-bigsur, appveyor_build_worker_image: macos-mojave ] }
     cache:
-      # - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
+      - build/vcpkg_installed -> vcpkg.json, cmake/vcpkg-triplets/arch-env.cmake
     install:
       - |-
         case $ARCH in
-        *arm64*)
+        arm64)
           DEPLOY_TARGET=11.0
-          sudo xcode-select -s /Applications/Xcode-12.3.app
+          sudo xcode-select -s /Applications/Xcode-13.2.1.app
           ;;
         *)
           DEPLOY_TARGET=10.9
@@ -79,72 +98,71 @@ for:
           ;;
         esac
 
+      # don't use LibXml2/SQLite3 from Mono
+      - sudo rm -r /Library/Frameworks/Mono.framework
+
       - |-
         if [ "$appveyor_build_worker_image" = "macos-mojave" ]; then
           # https://letsencrypt.org/docs/dst-root-ca-x3-expiration-september-2021/
           sudo curl -k https://curl.se/ca/cacert.pem -o /etc/ssl/cert.pem
-        fi
 
+          # update to Catch2 v3
+          git -C ~/vcpkg fetch origin 50fe35a3c3ca43ffe3b436380cf563100406459a
+          git -C ~/vcpkg restore -s 50fe35a3c3ca43ffe3b436380cf563100406459a ports/catch2
+        fi
     artifacts:
       - path: build/reaper_*.dylib
-      - path: build/*.pkg
 
   - matrix: { only: [ appveyor_build_worker_image: &windows Visual Studio 2022 ] }
-
     cache:
-      - build\vcpkg_installed -> vcpkg.json
+      - build\vcpkg_installed -> vcpkg.json, cmake\vcpkg-triplets\arm64ec-windows-static.cmake
     install:
-      - if "%ARCH%" == "x64" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-      - if "%ARCH%" == "x86" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
+      - if "%ARCH%" == "x64"     call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+      - if "%ARCH%" == "x86"     call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
+      - if "%ARCH%" == "arm64ec" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_arm64.bat"
+      - if "%ARCH%" == "arm64ec" set CFLAGS=-arm64EC & set CXXFLAGS=-arm64EC
     build_script:
-      - cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - set VCPKG_OVERLAY_TRIPLETS=cmake\vcpkg-triplets
+      - cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
         -DVCPKG_TARGET_TRIPLET=%ARCH%-windows-static
         -DCMAKE_TOOLCHAIN_FILE=C:\Tools\vcpkg\scripts\buildsystems\vcpkg.cmake
       - cmake --build build
-      - cd build
-      - if "%ARCH%" == "x64" cpack
     artifacts:
       - path: build\reaper_*.dll
-      - path: build\*.exe
-      - path: build\reaper_*64.pdb
-      - path: scripts\ReaBlink_Monitor.lua
+      - path: build\reaper_*.pdb
 
 environment:
-  BUILD_NUMBER: $(APPVEYOR_BUILD_NUMBER)
-  REPO_COMMIT: $(APPVEYOR_REPO_COMMIT)
-  REPO_TAG: $(APPVEYOR_REPO_TAG_NAME)
-
   matrix:
-    - job_name: macOS x86 32-bit
-      appveyor_build_worker_image: macos-mojave
-      ARCH: i386
-    - job_name: macOS universal 64-bit
-      appveyor_build_worker_image: macos-catalina
-      ARCH: arm64;x86_64
-    - job_name: macOS ARM 64-bit
-      appveyor_build_worker_image: macos-catalina
-      ARCH: arm64
+    - job_name: Windows x86 64-bit
+      appveyor_build_worker_image: *windows
+      ARCH: x64
+    - job_name: Windows x86 32-bit
+      appveyor_build_worker_image: *windows
+      ARCH: x86
+    - job_name: Windows ARM 64-bit EC
+      appveyor_build_worker_image: *windows
+      ARCH: arm64ec
     - job_name: macOS x86 64-bit
       appveyor_build_worker_image: macos-mojave
       ARCH: x86_64
-    - job_name: Linux ARM 32-bit
-      appveyor_build_worker_image: *linux
-      ARCH: armv7l
-    - job_name: Windows 64-bit
-      appveyor_build_worker_image: *windows
-      ARCH: x64
-    - job_name: Windows 32-bit
-      appveyor_build_worker_image: *windows
-      ARCH: x86
-    - job_name: Linux x86 32-bit
-      appveyor_build_worker_image: *linux
-      ARCH: i686
+    - job_name: macOS x86 32-bit
+      appveyor_build_worker_image: macos-mojave
+      ARCH: i386
+    - job_name: macOS ARM 64-bit
+      appveyor_build_worker_image: macos-bigsur
+      ARCH: arm64
     - job_name: Linux x86 64-bit
       appveyor_build_worker_image: *linux
       ARCH: x86_64
+    - job_name: Linux x86 32-bit
+      appveyor_build_worker_image: *linux
+      ARCH: i686
     - job_name: Linux ARM 64-bit
       appveyor_build_worker_image: *linux
       ARCH: aarch64
+    - job_name: Linux ARM 32-bit
+      appveyor_build_worker_image: *linux
+      ARCH: armv7l
 
 deploy:
   provider: GitHub

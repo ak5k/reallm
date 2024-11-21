@@ -2,12 +2,14 @@
 #include "Network.hpp"
 #include "reaper_vararg.hpp"
 #include <algorithm>
-#include <reaper_plugin_functions.h>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include <WDL/wdltypes.h>
+#include <reaper_plugin_functions.h>
 
 namespace reallm
 {
@@ -60,9 +62,7 @@ static inline T max(T a, T b)
 
 struct ParameterChange
 {
-    ParameterChange(
-        const char* fx_name, int parameter_index, double val1, double val2
-    )
+    ParameterChange(const char* fx_name, int parameter_index, double val1, double val2)
         : fx_name(fx_name)
         , parameter_index(parameter_index)
         , val1(val1)
@@ -80,8 +80,13 @@ std::vector<ParameterChange> parameter_changes;
 
 class TrackFx
 {
-  public:
-    TrackFx() : g(nullptr), tr(nullptr), fx_index(-1), isSafe(false), buf{}
+public:
+    TrackFx()
+        : g(nullptr)
+        , tr(nullptr)
+        , fx_index(-1)
+        , isSafe(false)
+        , buf{}
     {
     }
 
@@ -108,9 +113,7 @@ class TrackFx
             {
                 if (name.find(i.fx_name) != std::string::npos)
                 {
-                    TrackFX_SetParamNormalized(
-                        tr, fx_index, i.parameter_index, i.val2
-                    );
+                    TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val2);
                     hasParameterChange = false;
                     parameter_changed = true;
                 }
@@ -118,9 +121,7 @@ class TrackFx
         }
         if (!no_renaming)
         {
-            TrackFX_GetNamedConfigParm(
-                tr, fx_index, "renamed_name", buf, BUFSIZ
-            );
+            TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
             std::string str = buf;
             std::string substr = prefix_string;
             size_t pos = str.find(substr);
@@ -131,15 +132,9 @@ class TrackFx
             }
             TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
             if (str == buf)
-            {
                 TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", "");
-            }
             else
-            {
-                TrackFX_SetNamedConfigParm(
-                    tr, fx_index, "renamed_name", str.c_str()
-                );
-            }
+                TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", str.c_str());
         }
         if (hasParameterChange || parameter_changed)
             return;
@@ -161,9 +156,7 @@ class TrackFx
                 if (!hasParameterChange)
                 {
                     hasParameterChange = true;
-                    TrackFX_SetParamNormalized(
-                        tr, fx_index, i.parameter_index, i.val1
-                    );
+                    TrackFX_SetParamNormalized(tr, fx_index, i.parameter_index, i.val1);
                     parameter_changed = true;
                 }
             }
@@ -171,24 +164,16 @@ class TrackFx
         if (!no_renaming)
         {
             std::string str;
-            TrackFX_GetNamedConfigParm(
-                tr, fx_index, "renamed_name", buf, BUFSIZ
-            );
+            TrackFX_GetNamedConfigParm(tr, fx_index, "renamed_name", buf, BUFSIZ);
             str = buf;
             if (str.empty())
             {
-                TrackFX_GetNamedConfigParm(
-                    tr, fx_index, "fx_name", buf, BUFSIZ
-                );
+                TrackFX_GetNamedConfigParm(tr, fx_index, "fx_name", buf, BUFSIZ);
                 str = buf;
             }
             std::string prefix = prefix_string;
             if (!(str.substr(0, prefix.size()) == prefix))
-            {
-                TrackFX_SetNamedConfigParm(
-                    tr, fx_index, "renamed_name", (prefix + str).c_str()
-                );
-            }
+                TrackFX_SetNamedConfigParm(tr, fx_index, "renamed_name", (prefix + str).c_str());
         }
         if (hasParameterChange || parameter_changed)
             return;
@@ -254,7 +239,7 @@ class TrackFx
         this->hasParameterChange = hasParameterChange;
     }
 
-  private:
+private:
     GUID* g{};
     MediaTrack* tr;
     int fx_index;
@@ -276,9 +261,7 @@ auto ToggleActionCallback(int command) -> int
     return 0;
 }
 
-auto OnAction(
-    KbdSectionInfo* sec, int command, int val, int valhw, int relmode, HWND hwnd
-) -> bool
+auto OnAction(KbdSectionInfo* sec, int command, int val, int valhw, int relmode, HWND hwnd) -> bool
 {
     // treat unused variables 'pedantically'
     (void)sec;
@@ -322,17 +305,14 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
     for (int j = 0; j < numSends; j++)
     {
         MediaTrack* destinationTrack{nullptr};
-        destinationTrack = (MediaTrack*)(UINT_PTR
-        )GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
-        bool isSendMuted =
-            (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
+        destinationTrack = (MediaTrack*)(UINT_PTR)GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
+        bool isSendMuted = (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
         if (!isSendMuted)
             destinationTracks.push_back(destinationTrack);
     }
 
     // Check if the track has a parent track
-    MediaTrack* parentTrack =
-        (MediaTrack*)GetSetMediaTrackInfo(sourceTrack, "P_PARTRACK", NULL);
+    MediaTrack* parentTrack = (MediaTrack*)GetSetMediaTrackInfo(sourceTrack, "P_PARTRACK", NULL);
     if (parentTrack != NULL)
     {
         // Check if the parent send is active
@@ -372,22 +352,15 @@ void dfs(
     else
     {
         for (auto&& nextTrack : network.getNodes()[currentTrack])
-        {
-            if (std::find(visited.begin(), visited.end(), nextTrack) ==
-                visited.end())
-            {
+            if (std::find(visited.begin(), visited.end(), nextTrack) == visited.end())
                 dfs(network, nextTrack, targetTrack, visited, path, allPaths);
-            }
-        }
     }
 
     path.pop_back();
 }
 
 std::vector<std::vector<MediaTrack*>> findAllPaths(
-    Network<MediaTrack*>& network,
-    std::vector<MediaTrack*>& inputTracks,
-    std::vector<MediaTrack*>& outputTracks
+    Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks, std::vector<MediaTrack*>& outputTracks
 )
 {
     std::vector<std::vector<MediaTrack*>> allPaths;
@@ -406,9 +379,7 @@ std::vector<std::vector<MediaTrack*>> findAllPaths(
 }
 
 // NOLINTNEXTLINE
-int CalculateTrackPdc(
-    MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set
-)
+int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set)
 {
     auto pdc_mode = 0;
     char buf[BUFSIZ];
@@ -428,35 +399,26 @@ int CalculateTrackPdc(
     for (int j = 0; j < fx_count; j++)
     {
         auto i = j;
-        if (tr == GetMasterTrack(0) && include_monitoring_fx &&
-            i >= TrackFX_GetCount(tr))
-        {
+        if (tr == GetMasterTrack(0) && include_monitoring_fx && i >= TrackFX_GetCount(tr))
             i = i - TrackFX_GetCount(tr) + 0x1000000;
-        }
         auto* g = TrackFX_GetFXGUID(tr, i);
         auto fx_pdc = fx_map[g].getPdc();
         auto flicker{false};
-        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_pdc == 0 &&
-            !TrackFX_GetEnabled(tr, i))
+        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_pdc == 0 && !TrackFX_GetEnabled(tr, i))
         {
             fx_set.insert(&fx_map[g]);
             flicker = true;
         }
-        if (fx_set_prev.find(&fx_map[g]) == fx_set_prev.end() &&
-            !TrackFX_GetEnabled(tr, i))
-        {
+        if (fx_set_prev.find(&fx_map[g]) == fx_set_prev.end() && !TrackFX_GetEnabled(tr, i))
             fx_pdc = 0;
-        }
         if (!flicker && fx_pdc == 0)
             continue;
-        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() &&
-            fx_map[g].getSafe() && !TrackFX_GetEnabled(tr, i))
+        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_map[g].getSafe() && !TrackFX_GetEnabled(tr, i))
         {
             fx_map[g].setSafe(false);
         }
-        else if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() &&
-             !fx_map[g].getSafe() && TrackFX_GetEnabled(tr, i) &&
-             !fx_map[g].getParameterChange())
+        else if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && !fx_map[g].getSafe() &&
+                 TrackFX_GetEnabled(tr, i) && !fx_map[g].getParameterChange())
         {
             fx_map[g].setSafe(true);
             // fx_set_prev.erase(&fx_map[g]);
@@ -465,8 +427,7 @@ int CalculateTrackPdc(
         // classic pdc
         if (pdc_mode == 0 && keep_pdc)
         {
-            fx_pdc =
-                fx_pdc % bsize == 0 ? fx_pdc : (fx_pdc / bsize + 1) * bsize;
+            fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : (fx_pdc / bsize + 1) * bsize;
             if (pdc + fx_pdc > pdc_limit && !fx_map[g].getSafe())
                 fx_set.insert(&fx_map[g]);
             else
@@ -477,8 +438,7 @@ int CalculateTrackPdc(
         if (pdc_mode == 1 && keep_pdc)
         {
             tr_pdc += fx_pdc;
-            auto temp =
-                tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
+            auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
             if (pdc + temp > pdc_limit && !fx_map[g].getSafe())
             {
                 tr_pdc -= fx_pdc;
@@ -487,8 +447,7 @@ int CalculateTrackPdc(
         }
 
         // no pdc
-        if (pdc_mode == 2 ||
-            (!keep_pdc && pdc_mode == 1 && reaperVersion >= 6.72))
+        if (pdc_mode == 2 || (!keep_pdc && pdc_mode == 1 && reaperVersion >= 6.72))
         {
             pdc += fx_pdc;
             if (pdc > pdc_limit && !fx_map[g].getSafe())
@@ -625,11 +584,8 @@ void main()
         auto i_recarm = *(int*)GetSetMediaTrackInfo(tr, "I_RECARM", NULL);
         auto i_recmon = *(int*)GetSetMediaTrackInfo(tr, "I_RECMON", NULL);
         auto tr_auto_mode = GetTrackAutomationMode(tr);
-        if ((i_recarm != 0 && i_recmon != 0) ||
-            (tr_auto_mode > 1 && tr_auto_mode < 6))
-        {
+        if ((i_recarm != 0 && i_recmon != 0) || (tr_auto_mode > 1 && tr_auto_mode < 6))
             inputTracks.push_back(tr);
-        }
 
         // get fx
         auto fx_count = TrackFX_GetCount(tr);
@@ -638,11 +594,8 @@ void main()
         for (int j = 0; j < fx_count; j++)
         {
             auto idx = j;
-            if (i == num_tracks && include_monitoring_fx &&
-                idx >= TrackFX_GetCount(tr))
-            {
+            if (i == num_tracks && include_monitoring_fx && idx >= TrackFX_GetCount(tr))
                 idx = idx - TrackFX_GetCount(tr) + 0x1000000;
-            }
             auto g = TrackFX_GetFXGUID(tr, idx);
             fx_map[g] = TrackFx(g, tr, idx);
             TrackFX_GetFXName(tr, idx, buf, BUFSIZ);
@@ -711,10 +664,7 @@ void main()
     {
         int accumulating_pdc = 0;
         for (auto&& tr : path)
-        {
-            accumulating_pdc =
-                CalculateTrackPdc(tr, accumulating_pdc, fx_set_to_disable);
-        }
+            accumulating_pdc = CalculateTrackPdc(tr, accumulating_pdc, fx_set_to_disable);
     }
 
     int num_actions = (int)(fx_set_to_disable.size() + fx_set_prev.size()) * 2;
@@ -799,9 +749,7 @@ void main()
     // store state
     state = serializeFxSet(fx_set_to_disable);
     SetProjExtState(0, "ak5k", "reallm", state.c_str());
-    SetProjExtState(
-        0, "ak5k", "reallm_sz", std::to_string(state.size()).c_str()
-    );
+    SetProjExtState(0, "ak5k", "reallm_sz", std::to_string(state.size()).c_str());
 
     if (shutdown)
     {
@@ -821,8 +769,7 @@ void main()
     // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
-const char* defstring_SetPdcLimit =
-    "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
+const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
 
 void SetPdcLimit(double limit)
 {
@@ -871,25 +818,16 @@ const char* defstring_SetParameterChange =
     "between values val1 and val2 for fx_name and parameter_index instead of "
     "disabling the effect. Use custom fx names to identify individual fx.";
 
-void SetParameterChange(
-    const char* fx_name, int parameter_index, double val1, double val2
-)
+void SetParameterChange(const char* fx_name, int parameter_index, double val1, double val2)
 {
     if (val1 == val2)
     {
         auto it = parameter_changes.begin();
         while (it != parameter_changes.end())
-        {
-            if (it->fx_name == fx_name &&
-                it->parameter_index == parameter_index)
-            {
+            if (it->fx_name == fx_name && it->parameter_index == parameter_index)
                 it = parameter_changes.erase(it);
-            }
             else
-            {
                 ++it;
-            }
-        }
         return;
     }
     if (parameter_index == -666)
@@ -897,9 +835,7 @@ void SetParameterChange(
         parameter_changes.clear();
         return;
     }
-    parameter_changes.emplace_back(
-        ParameterChange(fx_name, parameter_index, val1, val2)
-    );
+    parameter_changes.emplace_back(ParameterChange(fx_name, parameter_index, val1, val2));
 }
 
 const char* defstring_SetKeepPdc = "void\0bool\0enable\0Set keep pdc";
@@ -924,11 +860,7 @@ const char* defstring_GetPaths =
     "included.";
 
 void GetPaths(
-    bool includeFx,
-    MediaTrack* startInOptional,
-    MediaTrack* endInOptional,
-    char* pathStringOut,
-    int pathStringOut_sz
+    bool includeFx, MediaTrack* startInOptional, MediaTrack* endInOptional, char* pathStringOut, int pathStringOut_sz
 )
 {
     std::string result;
@@ -960,15 +892,10 @@ void GetPaths(
                 for (int k = 0; k < fx_count; k++)
                 {
                     auto idx = k;
-                    if (j == GetMasterTrack(NULL) && include_monitoring_fx &&
-                        idx >= TrackFX_GetCount(j))
-                    {
+                    if (j == GetMasterTrack(NULL) && include_monitoring_fx && idx >= TrackFX_GetCount(j))
                         idx = idx - TrackFX_GetCount(j) + 0x1000000;
-                    }
                     char buf[BUFSIZ];
-                    TrackFX_GetNamedConfigParm(
-                        j, idx, "renamed_name", buf, BUFSIZ
-                    );
+                    TrackFX_GetNamedConfigParm(j, idx, "renamed_name", buf, BUFSIZ);
                     std::string str = buf;
                     std::string prefix = prefix_string;
                     if (str.substr(0, prefix.length()) == prefix)
@@ -1012,10 +939,8 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
         {
             if (ValidatePtr2(0, i.second.getTrack(), "MediaTrack*"))
             {
-                auto num_track = (int
-                )GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
-                result += std::to_string(num_track) + ":" +
-                          std::to_string(i.second.getFxIndex() + 1) + ";";
+                auto num_track = (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
+                result += std::to_string(num_track) + ":" + std::to_string(i.second.getFxIndex() + 1) + ";";
             }
         }
     }
@@ -1057,25 +982,15 @@ const char* defstring_GetVersion =
     "Get version. Returns the version of the plugin as integers and the commit "
     "hash as a string. The string is truncated to commitOut_sz.";
 
-void GetVersion(
-    int* majorOut,
-    int* minorOut,
-    int* patchOut,
-    int* buildOut,
-    char* commitOut,
-    int commitOut_sz
-)
+void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut, int commitOut_sz)
 {
     *majorOut = PROJECT_VERSION_MAJOR;
     *minorOut = PROJECT_VERSION_MINOR;
     *patchOut = PROJECT_VERSION_PATCH;
     *buildOut = PROJECT_VERSION_TWEAK;
     const char* commit = PROJECT_VERSION_COMMIT;
-    std::copy(
-        commit, commit + min(commitOut_sz - 1, (int)strlen(commit)), commitOut
-    );
-    commitOut[min(commitOut_sz - 1, (int)strlen(commit))] =
-        '\0'; // Ensure null termination
+    std::copy(commit, commit + min(commitOut_sz - 1, (int)strlen(commit)), commitOut);
+    commitOut[min(commitOut_sz - 1, (int)strlen(commit))] = '\0'; // Ensure null termination
 }
 
 void Register()
@@ -1088,75 +1003,44 @@ void Register()
 
     plugin_register("API_Llm_Do", (void*)main);
     plugin_register("APIdef_Llm_Do", (void*)defstring_Do);
-    plugin_register(
-        "APIvararg_Llm_Do", reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>)
-    );
+    plugin_register("APIvararg_Llm_Do", reinterpret_cast<void*>(&InvokeReaScriptAPI<&main>));
 
     plugin_register("API_Llm_GetVersion", (void*)GetVersion);
     plugin_register("APIdef_Llm_GetVersion", (void*)defstring_GetVersion);
-    plugin_register(
-        "APIvararg_Llm_GetVersion",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>)
-    );
+    plugin_register("APIvararg_Llm_GetVersion", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>));
 
     plugin_register("API_Llm_SetSafed", (void*)SetSafed);
     plugin_register("APIdef_Llm_SetSafed", (void*)defstring_SetSafed);
-    plugin_register(
-        "APIvararg_Llm_SetSafed",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>)
-    );
+    plugin_register("APIvararg_Llm_SetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>));
 
     plugin_register("API_Llm_GetSafed", (void*)GetSafed);
     plugin_register("APIdef_Llm_GetSafed", (void*)defstring_GetSafed);
-    plugin_register(
-        "APIvararg_Llm_GetSafed",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>)
-    );
+    plugin_register("APIvararg_Llm_GetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>));
 
     plugin_register("API_Llm_GetPaths", (void*)GetPaths);
     plugin_register("APIdef_Llm_GetPaths", (void*)defstring_GetPaths);
-    plugin_register(
-        "APIvararg_Llm_GetPaths",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>)
-    );
+    plugin_register("APIvararg_Llm_GetPaths", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>));
 
     plugin_register("API_Llm_SetKeepPdc", (void*)SetKeepPdc);
     plugin_register("APIdef_Llm_SetKeepPdc", (void*)defstring_SetKeepPdc);
-    plugin_register(
-        "APIvararg_Llm_SetKeepPdc",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>)
-    );
+    plugin_register("APIvararg_Llm_SetKeepPdc", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>));
 
     plugin_register("API_Llm_SetParameterChange", (void*)SetParameterChange);
+    plugin_register("APIdef_Llm_SetParameterChange", (void*)defstring_SetParameterChange);
     plugin_register(
-        "APIdef_Llm_SetParameterChange", (void*)defstring_SetParameterChange
-    );
-    plugin_register(
-        "APIvararg_Llm_SetParameterChange",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>)
+        "APIvararg_Llm_SetParameterChange", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>)
     );
 
     plugin_register("API_Llm_SetClearSafe", (void*)SetClearSafe);
     plugin_register("APIdef_Llm_SetClearSafe", (void*)defstring_SetClearSafe);
-    plugin_register(
-        "APIvararg_Llm_SetClearSafe",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>)
-    );
+    plugin_register("APIvararg_Llm_SetClearSafe", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>));
 
     plugin_register("API_Llm_SetMonitoringFX", (void*)SetMonitoringFX);
-    plugin_register(
-        "APIdef_Llm_SetMonitoringFX", (void*)defstring_SetMonitoringFX
-    );
-    plugin_register(
-        "APIvararg_Llm_SetMonitoringFX",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>)
-    );
+    plugin_register("APIdef_Llm_SetMonitoringFX", (void*)defstring_SetMonitoringFX);
+    plugin_register("APIvararg_Llm_SetMonitoringFX", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>));
 
     plugin_register("API_Llm_SetPdcLimit", (void*)SetPdcLimit);
     plugin_register("APIdef_Llm_SetPdcLimit", (void*)defstring_SetPdcLimit);
-    plugin_register(
-        "APIvararg_Llm_SetPdcLimit",
-        reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>)
-    );
+    plugin_register("APIvararg_Llm_SetPdcLimit", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
 }
 } // namespace reallm
