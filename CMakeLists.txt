@@ -157,7 +157,8 @@ if(WIN32)
     )
   endif()
 else()
-  add_compile_options(-fsigned-char -fstack-protector-strong -fdiagnostics-color)
+  # add_compile_options(-fsigned-char -fstack-protector-strong -fdiagnostics-color)
+  target_compile_options(${PROJECT_NAME} PRIVAT -fsigned-char -fstack-protector-strong -fdiagnostics-color)
 endif()
 
 
