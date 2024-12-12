@@ -585,7 +585,15 @@ void main()
         auto i_recmon = *(int*)GetSetMediaTrackInfo(tr, "I_RECMON", NULL);
         auto tr_auto_mode = GetTrackAutomationMode(tr);
         if ((i_recarm != 0 && i_recmon != 0) || (tr_auto_mode > 1 && tr_auto_mode < 6))
+        {
             inputTracks.push_back(tr);
+        }
+        else
+        {
+            const char* trackName = (const char*)GetSetMediaTrackInfo(tr, "P_NAME", NULL);
+            if (trackName && std::string(trackName).find("Llm") != std::string::npos)
+                inputTracks.push_back(tr);
+        }
 
         // get fx
         auto fx_count = TrackFX_GetCount(tr);
