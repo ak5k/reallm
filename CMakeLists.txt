@@ -32,37 +32,38 @@ set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# path for external 3rd party library dependencies 
 include(FetchContent)
-set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)
 
 FetchContent_Declare(GSL
     GIT_REPOSITORY "https://github.com/microsoft/GSL"
     GIT_TAG        "origin/main"
-    SOURCE_DIR     "${PROJECT_LIB_DIR}/GSL"
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
 )
 
 FetchContent_Declare(WDL
     GIT_REPOSITORY https://github.com/justinfrankel/WDL
     GIT_TAG        "origin/main" # or specify a tag or branch here
-    SOURCE_DIR     "${PROJECT_LIB_DIR}/WDL"
-    )
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
+)
 
-FetchContent_Declare(reaper-sdk
+FetchContent_Declare(reaper_sdk
     GIT_REPOSITORY https://github.com/justinfrankel/reaper-sdk
     GIT_TAG        "origin/main" # or specify a tag or branch here
-    SOURCE_DIR     "${PROJECT_LIB_DIR}/reaper-sdk"
-    )
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
+)
 
-FetchContent_MakeAvailable(GSL WDL reaper-sdk)
+FetchContent_MakeAvailable(GSL WDL reaper_sdk)
 
 # symlink WDL to reaper-sdk
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink
             # source
-            "${PROJECT_LIB_DIR}/WDL/WDL"
+            "${wdl_SOURCE_DIR}/WDL"
             # target
-            "${PROJECT_LIB_DIR}/reaper-sdk/WDL"
+            "${reaper_sdk_SOURCE_DIR}/WDL"
 )
 
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -74,10 +75,12 @@ if(DEFINED ENV{VCPKG_DEFAULT_TRIPLET} AND NOT DEFINED VCPKG_TARGET_TRIPLET)
   set(VCPKG_TARGET_TRIPLET "$ENV{VCPKG_DEFAULT_TRIPLET}" CACHE STRING "")
 endif()
 
-FILE(GLOB header_paths 
-    ${PROJECT_LIB_DIR}/*/include
-    ${PROJECT_LIB_DIR}/*/sdk
-    )
+set(WDL_ROOT_DIR "${wdl_SOURCE_DIR}")
+
+set(header_paths
+  "${gsl_SOURCE_DIR}/include"
+  "${reaper_sdk_SOURCE_DIR}/sdk"
+)
 
 add_library(reaper-sdk IMPORTED INTERFACE)
 target_include_directories(reaper-sdk INTERFACE ${header_paths})

@@ -2,9 +2,15 @@ if(WDL_FOUND)
   return()
 endif()
 
+set(_WDL_SEARCH_PATHS)
+if(DEFINED WDL_ROOT_DIR)
+  list(APPEND _WDL_SEARCH_PATHS "${WDL_ROOT_DIR}")
+endif()
+list(APPEND _WDL_SEARCH_PATHS "${CMAKE_SOURCE_DIR}/lib/WDL")
+
 find_path(WDL_INCLUDE_DIR
   NAMES WDL/wdltypes.h
-  PATHS ${CMAKE_SOURCE_DIR}/lib/WDL
+  PATHS ${_WDL_SEARCH_PATHS}
   NO_DEFAULT_PATH
 )
 mark_as_advanced(WDL_INCLUDE_DIR)

@@ -1,9 +1,6 @@
 ---
 version: "{build}-{branch}"
 
-# before_build:
-#   - git submodule update --init --depth 1
-
 build_script:
   - export VCPKG_OVERLAY_TRIPLETS=cmake/vcpkg-triplets
   - cmake -B build -DCMAKE_BUILD_TYPE=Release
