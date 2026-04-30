@@ -252,6 +252,411 @@ private:
 std::unordered_map<GUID*, TrackFx> fx_map;
 std::unordered_set<TrackFx*> fx_set_prev;
 
+std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack);
+std::vector<std::vector<MediaTrack*>> findAllPaths(
+    Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks, std::vector<MediaTrack*>& outputTracks
+);
+int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set);
+std::string serializeFxSet(std::unordered_set<TrackFx*>& fx_to_disable);
+std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized);
+
+enum class RuntimePhase
+{
+    Idle,
+    BuildSnapshot,
+    Analyze,
+    Apply,
+    Persist
+};
+
+struct RuntimeState
+{
+    RuntimePhase phase{RuntimePhase::Idle};
+    int trackCursor{0};
+    int totalTracksWithMaster{0};
+    int buildVersion{0};
+    int snapshotVersion{0};
+    int ticksSinceBuild{0};
+    bool snapshotReady{false};
+
+    Network<MediaTrack*> pendingNetwork;
+    std::unordered_map<GUID*, TrackFx> pendingFxMap;
+    std::vector<MediaTrack*> pendingInputTracks;
+    std::vector<MediaTrack*> pendingOutputTracks;
+    std::unordered_set<TrackFx*> pendingOrphans;
+    std::unordered_set<TrackFx*> orphanCandidates;
+
+    std::vector<std::vector<MediaTrack*>> paths;
+    std::unordered_set<TrackFx*> desiredDisableSet;
+    std::unordered_set<TrackFx*> desiredFinalSet;
+    std::vector<TrackFx*> disableQueue;
+    std::vector<TrackFx*> enableQueue;
+    std::vector<TrackFx*> orphanEnableQueue;
+    size_t disableCursor{0};
+    size_t enableCursor{0};
+    size_t orphanCursor{0};
+    bool applyUndoOpen{false};
+    int applyAutomationOverride{0};
+
+    std::string stateBuffer;
+};
+
+static RuntimeState runtime;
+
+constexpr int kTrackScanBudgetPerTick = 6;
+constexpr int kFxApplyBudgetPerTick = 16;
+constexpr int kBuildRefreshIntervalTicks = 3;
+
+void resetPlanQueues(RuntimeState& rt)
+{
+    rt.disableQueue.clear();
+    rt.enableQueue.clear();
+    rt.orphanEnableQueue.clear();
+    rt.disableCursor = 0;
+    rt.enableCursor = 0;
+    rt.orphanCursor = 0;
+}
+
+void closeApplyUndoIfOpen(RuntimeState& rt)
+{
+    if (!rt.applyUndoOpen)
+        return;
+
+    SetGlobalAutomationOverride(rt.applyAutomationOverride);
+    Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
+    rt.applyAutomationOverride = 0;
+    rt.applyUndoOpen = false;
+}
+
+void beginSnapshotBuild(RuntimeState& rt)
+{
+    rt.phase = RuntimePhase::BuildSnapshot;
+    rt.trackCursor = 0;
+    rt.totalTracksWithMaster = GetNumTracks() + 1;
+    rt.buildVersion++;
+    rt.ticksSinceBuild = 0;
+
+    rt.pendingNetwork.clear();
+    rt.pendingFxMap.clear();
+    rt.pendingInputTracks.clear();
+    rt.pendingOutputTracks.clear();
+    rt.pendingOrphans.clear();
+
+    rt.pendingInputTracks.reserve(static_cast<size_t>(rt.totalTracksWithMaster));
+    rt.pendingOutputTracks.reserve(static_cast<size_t>(rt.totalTracksWithMaster));
+}
+
+void appendTrackToPendingSnapshot(RuntimeState& rt, int trackIndex, char* buf)
+{
+    const int num_tracks = rt.totalTracksWithMaster - 1;
+    MediaTrack* tr = nullptr;
+    if (trackIndex == num_tracks)
+        tr = GetMasterTrack(NULL);
+    else
+        tr = GetTrack(0, trackIndex);
+
+    if (!tr)
+        return;
+
+    rt.pendingNetwork.addNode(tr);
+    auto destinations = GetAllTrackSendDestinations(tr);
+    for (auto&& dest : destinations)
+        rt.pendingNetwork.addLink(tr, dest);
+
+    if (GetTrackNumSends(tr, 1) > 0)
+        rt.pendingOutputTracks.push_back(tr);
+
+    auto i_recarm = *(int*)GetSetMediaTrackInfo(tr, "I_RECARM", NULL);
+    auto i_recmon = *(int*)GetSetMediaTrackInfo(tr, "I_RECMON", NULL);
+    auto tr_auto_mode = GetTrackAutomationMode(tr);
+    if ((i_recarm != 0 && i_recmon != 0) || (tr_auto_mode > 1 && tr_auto_mode < 6))
+    {
+        rt.pendingInputTracks.push_back(tr);
+    }
+    else
+    {
+        const char* trackName = (const char*)GetSetMediaTrackInfo(tr, "P_NAME", NULL);
+        if (trackName && std::string(trackName).find("Llm") != std::string::npos)
+            rt.pendingInputTracks.push_back(tr);
+    }
+
+    auto fx_count = TrackFX_GetCount(tr);
+    if (trackIndex == num_tracks && include_monitoring_fx)
+        fx_count += TrackFX_GetRecCount(tr);
+
+    for (int j = 0; j < fx_count; j++)
+    {
+        auto idx = j;
+        if (trackIndex == num_tracks && include_monitoring_fx && idx >= TrackFX_GetCount(tr))
+            idx = idx - TrackFX_GetCount(tr) + 0x1000000;
+
+        auto g = TrackFX_GetFXGUID(tr, idx);
+        rt.pendingFxMap[g] = TrackFx(g, tr, idx);
+
+        TrackFX_GetFXName(tr, idx, buf, BUFSIZ);
+        std::string str = buf;
+        for (auto&& safeName : safed_fx_names)
+            if (str.find(safeName) != std::string::npos)
+                rt.pendingFxMap[g].setSafe(true);
+
+        if (!no_renaming)
+        {
+            size_t pos = str.find(prefix_string);
+            if (pos != std::string::npos)
+                rt.pendingOrphans.insert(&rt.pendingFxMap[g]);
+        }
+    }
+}
+
+bool processSnapshotBuildBudget(RuntimeState& rt, int trackBudget, char* buf)
+{
+    int scanned = 0;
+    while (rt.trackCursor < rt.totalTracksWithMaster && scanned < trackBudget)
+    {
+        appendTrackToPendingSnapshot(rt, rt.trackCursor, buf);
+        rt.trackCursor++;
+        scanned++;
+    }
+
+    if (rt.trackCursor >= rt.totalTracksWithMaster)
+    {
+        std::swap(network, rt.pendingNetwork);
+        std::swap(fx_map, rt.pendingFxMap);
+        std::swap(inputTracks, rt.pendingInputTracks);
+        std::swap(outputTracks, rt.pendingOutputTracks);
+        std::swap(rt.orphanCandidates, rt.pendingOrphans);
+        rt.snapshotReady = true;
+        rt.snapshotVersion = rt.buildVersion;
+        rt.phase = RuntimePhase::Analyze;
+        return true;
+    }
+
+    return false;
+}
+
+void loadPreviousState(std::unordered_set<TrackFx*>& state, std::string& stateBuffer, char* buf)
+{
+    GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
+    const auto stateSize = buf[0] != '\0' ? std::stoi(buf) : 0;
+    if (stateSize <= 0)
+    {
+        state.clear();
+        stateBuffer.clear();
+        return;
+    }
+
+    if (stateSize != (int)stateBuffer.size())
+        stateBuffer.resize(stateSize);
+
+    GetProjExtState(0, "ak5k", "reallm", &stateBuffer[0], stateSize);
+    state = deserializeFxSet(stateBuffer);
+}
+
+void buildAnalysisPlan(RuntimeState& rt, char* buf)
+{
+    if (!rt.snapshotReady)
+        return;
+
+    loadPreviousState(fx_set_prev, rt.stateBuffer, buf);
+
+    std::vector<MediaTrack*> analysisInputs = inputTracks;
+    if (shutdown)
+        analysisInputs.clear();
+
+    rt.paths = findAllPaths(network, analysisInputs, outputTracks);
+
+    static std::unordered_set<MediaTrack*> tracks_prev;
+    if (!keep_pdc && reaperVersion >= 6.72)
+    {
+        static std::unordered_set<MediaTrack*> tracks;
+        tracks.clear();
+
+        for (auto&& path : rt.paths)
+            for (auto&& tr : path)
+                tracks.insert(tr);
+
+        for (auto&& tr : tracks)
+            if (tracks_prev.find(tr) == tracks_prev.end())
+                TrackFX_SetNamedConfigParm(tr, 0, "chain_pdc_mode", "2");
+
+        for (auto&& tr : tracks_prev)
+            if (tracks.find(tr) == tracks.end())
+                TrackFX_SetNamedConfigParm(tr, 0, "chain_pdc_mode", "1");
+
+        tracks_prev = tracks;
+    }
+
+    rt.desiredDisableSet.clear();
+    for (auto&& path : rt.paths)
+    {
+        int accumulating_pdc = 0;
+        for (auto&& tr : path)
+            accumulating_pdc = CalculateTrackPdc(tr, accumulating_pdc, rt.desiredDisableSet);
+    }
+
+    resetPlanQueues(rt);
+    rt.desiredFinalSet.clear();
+
+    for (auto&& fx : rt.desiredDisableSet)
+    {
+        rt.desiredFinalSet.insert(fx);
+        if (fx_set_prev.find(fx) == fx_set_prev.end() && !fx->getSafe())
+            rt.disableQueue.push_back(fx);
+    }
+
+    for (auto&& fx : fx_set_prev)
+    {
+        if (rt.desiredDisableSet.find(fx) == rt.desiredDisableSet.end())
+        {
+            if ((!fx->getEnabled() || fx->getParameterChange()) && !fx->getSafe())
+                rt.enableQueue.push_back(fx);
+            if (fx->getSafe())
+                rt.desiredFinalSet.insert(fx);
+        }
+    }
+
+    if (!no_renaming)
+    {
+        for (auto&& orphan : rt.orphanCandidates)
+            if (rt.desiredFinalSet.find(orphan) == rt.desiredFinalSet.end())
+                rt.orphanEnableQueue.push_back(orphan);
+    }
+
+    rt.phase = RuntimePhase::Apply;
+}
+
+void applyQueuedChanges(RuntimeState& rt, int budget)
+{
+    if (budget <= 0)
+        return;
+
+    const size_t pendingDisable = rt.disableQueue.size() - rt.disableCursor;
+    const size_t pendingEnable = rt.enableQueue.size() - rt.enableCursor;
+    const size_t pendingOrphan = rt.orphanEnableQueue.size() - rt.orphanCursor;
+    const size_t pendingTotal = pendingDisable + pendingEnable + pendingOrphan;
+    if (pendingTotal == 0)
+    {
+        closeApplyUndoIfOpen(rt);
+        rt.phase = RuntimePhase::Persist;
+        return;
+    }
+
+    int remaining = std::min<int>(budget, static_cast<int>(pendingTotal));
+    int applied = 0;
+
+    if (!rt.applyUndoOpen)
+    {
+        Undo_BeginBlock();
+        rt.applyAutomationOverride = GetGlobalAutomationOverride();
+        SetGlobalAutomationOverride(6);
+        rt.applyUndoOpen = true;
+    }
+
+    PreventUIRefresh(remaining * 2);
+
+    while (remaining > 0 && rt.disableCursor < rt.disableQueue.size())
+    {
+        rt.disableQueue[rt.disableCursor]->disable();
+        rt.disableCursor++;
+        remaining--;
+        applied++;
+    }
+
+    while (remaining > 0 && rt.enableCursor < rt.enableQueue.size())
+    {
+        rt.enableQueue[rt.enableCursor]->enable();
+        rt.enableCursor++;
+        remaining--;
+        applied++;
+    }
+
+    while (remaining > 0 && rt.orphanCursor < rt.orphanEnableQueue.size())
+    {
+        rt.orphanEnableQueue[rt.orphanCursor]->enable();
+        rt.orphanCursor++;
+        remaining--;
+        applied++;
+    }
+
+    PreventUIRefresh(-(applied * 2));
+
+    if (rt.disableCursor == rt.disableQueue.size() && rt.enableCursor == rt.enableQueue.size() &&
+        rt.orphanCursor == rt.orphanEnableQueue.size())
+    {
+        closeApplyUndoIfOpen(rt);
+        rt.phase = RuntimePhase::Persist;
+    }
+}
+
+void persistDesiredState(RuntimeState& rt)
+{
+    fx_set_prev = rt.desiredFinalSet;
+    rt.stateBuffer = serializeFxSet(fx_set_prev);
+    SetProjExtState(0, "ak5k", "reallm", rt.stateBuffer.c_str());
+    SetProjExtState(0, "ak5k", "reallm_sz", std::to_string(rt.stateBuffer.size()).c_str());
+    rt.phase = RuntimePhase::Idle;
+}
+
+void rebuildSnapshotAndEnableAllForShutdown(RuntimeState& rt, char* buf)
+{
+    closeApplyUndoIfOpen(rt);
+
+    rt.pendingNetwork.clear();
+    rt.pendingFxMap.clear();
+    rt.pendingInputTracks.clear();
+    rt.pendingOutputTracks.clear();
+    rt.pendingOrphans.clear();
+
+    rt.totalTracksWithMaster = GetNumTracks() + 1;
+    for (int i = 0; i < rt.totalTracksWithMaster; i++)
+        appendTrackToPendingSnapshot(rt, i, buf);
+
+    std::swap(network, rt.pendingNetwork);
+    std::swap(fx_map, rt.pendingFxMap);
+    std::swap(inputTracks, rt.pendingInputTracks);
+    std::swap(outputTracks, rt.pendingOutputTracks);
+
+    loadPreviousState(fx_set_prev, rt.stateBuffer, buf);
+
+    std::vector<TrackFx*> orphanCleanupQueue;
+    if (!no_renaming)
+    {
+        orphanCleanupQueue.reserve(rt.pendingOrphans.size());
+        for (auto&& orphan : rt.pendingOrphans)
+            if (fx_set_prev.find(orphan) == fx_set_prev.end())
+                orphanCleanupQueue.push_back(orphan);
+    }
+
+    if (!fx_set_prev.empty() || !orphanCleanupQueue.empty())
+    {
+        Undo_BeginBlock();
+        const int automation_temp_override = GetGlobalAutomationOverride();
+        SetGlobalAutomationOverride(6);
+        PreventUIRefresh((int)(fx_set_prev.size() + orphanCleanupQueue.size()) * 2);
+        for (auto&& fx : fx_set_prev)
+            if (!fx->getSafe() && (!fx->getEnabled() || fx->getParameterChange()))
+                fx->enable();
+        for (auto&& orphan : orphanCleanupQueue)
+            orphan->enable();
+        PreventUIRefresh(-((int)(fx_set_prev.size() + orphanCleanupQueue.size()) * 2));
+        SetGlobalAutomationOverride(automation_temp_override);
+        Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
+    }
+
+    fx_set_prev.clear();
+    SetProjExtState(0, "ak5k", "reallm", "");
+    SetProjExtState(0, "ak5k", "reallm_sz", "0");
+
+    shutdown = false;
+    no_renaming = false;
+    rt.phase = RuntimePhase::Idle;
+    rt.snapshotReady = true;
+    rt.ticksSinceBuild = 0;
+    rt.applyAutomationOverride = 0;
+    rt.applyUndoOpen = false;
+    resetPlanQueues(rt);
+}
+
 auto ToggleActionCallback(int command) -> int
 {
     if (command != command_id)
@@ -535,14 +940,11 @@ const char* defstring_Do =
 // NOLINTNEXTLINE
 void main()
 {
-    // check if project state has changed
-    if (!Audio_IsRunning)
+    if (!Audio_IsRunning())
         return;
 
-    // get audio device buffer size
     auto start_time = time_precise();
 
-    // get pdc limit
     char buf[BUFSIZ];
     int input = 0;
     int output = 0;
@@ -555,226 +957,36 @@ void main()
     if (reaperVersion < 6.20)
         keep_pdc = true;
 
-    // build network
-    network.clear();
-    fx_map.clear();
-    inputTracks.clear();
-    outputTracks.clear();
-    static std::unordered_set<TrackFx*> possibleOrphans;
-    possibleOrphans.clear();
-    auto num_tracks = GetNumTracks();
-    for (int i = 0; i < num_tracks + 1; i++)
-    {
-        // get track
-        MediaTrack* tr = nullptr;
-        if (i == num_tracks)
-            tr = GetMasterTrack(NULL);
-        else
-            tr = GetTrack(0, i);
-        network.addNode(tr);
-        auto v = GetAllTrackSendDestinations(tr);
-        for (auto&& dest : v)
-            network.addLink(tr, dest);
-
-        // get output tracks
-        if (GetTrackNumSends(tr, 1) > 0)
-            outputTracks.push_back(tr);
-
-        // get input tracks
-        auto i_recarm = *(int*)GetSetMediaTrackInfo(tr, "I_RECARM", NULL);
-        auto i_recmon = *(int*)GetSetMediaTrackInfo(tr, "I_RECMON", NULL);
-        auto tr_auto_mode = GetTrackAutomationMode(tr);
-        if ((i_recarm != 0 && i_recmon != 0) || (tr_auto_mode > 1 && tr_auto_mode < 6))
-        {
-            inputTracks.push_back(tr);
-        }
-        else
-        {
-            const char* trackName = (const char*)GetSetMediaTrackInfo(tr, "P_NAME", NULL);
-            if (trackName && std::string(trackName).find("Llm") != std::string::npos)
-                inputTracks.push_back(tr);
-        }
-
-        // get fx
-        auto fx_count = TrackFX_GetCount(tr);
-        if (i == num_tracks && include_monitoring_fx)
-            fx_count = fx_count + TrackFX_GetRecCount(tr);
-        for (int j = 0; j < fx_count; j++)
-        {
-            auto idx = j;
-            if (i == num_tracks && include_monitoring_fx && idx >= TrackFX_GetCount(tr))
-                idx = idx - TrackFX_GetCount(tr) + 0x1000000;
-            auto g = TrackFX_GetFXGUID(tr, idx);
-            fx_map[g] = TrackFx(g, tr, idx);
-            TrackFX_GetFXName(tr, idx, buf, BUFSIZ);
-            std::string str = buf;
-            for (auto&& i : safed_fx_names)
-                if (str.find(i) != std::string::npos)
-                    fx_map[g].setSafe(true);
-            if (!no_renaming)
-            {
-                std::string substr = prefix_string;
-                size_t pos = str.find(substr);
-                if (pos != std::string::npos)
-                    possibleOrphans.insert(&fx_map[g]);
-            }
-        }
-    }
-
-    if (shutdown)
-        inputTracks.clear();
-
-    // get previous state
-    GetProjExtState(0, "ak5k", "reallm_sz", buf, BUFSIZ);
-    auto state_size = buf[0] != '\0' ? std::stoi(buf) : 0;
-    static std::string state;
-    state.clear();
-    if (state_size != (int)state.size())
-        state.resize(state_size);
-
-    GetProjExtState(0, "ak5k", "reallm", &state[0], state_size);
-    fx_set_prev.clear();
-    fx_set_prev = deserializeFxSet(state);
-
-    // get all paths
-    auto paths = findAllPaths(network, inputTracks, outputTracks);
-
-    static std::unordered_set<MediaTrack*> tracks_prev;
-    if (!keep_pdc && reaperVersion >= 6.72)
-    {
-        static std::unordered_set<MediaTrack*> tracks;
-        tracks.clear();
-        static std::unordered_set<MediaTrack*> tracks_diff;
-        tracks_diff.clear();
-        for (auto&& i : paths)
-            for (auto&& j : i)
-                tracks.insert(j);
-
-        for (const auto& track : tracks_prev)
-        {
-            if (tracks.find(track) == tracks.end())
-            {
-                // The track is not in tracks_prev
-                tracks_diff.insert(track);
-            }
-        }
-        tracks_prev = tracks;
-        for (auto&& i : tracks)
-            if (tracks_prev.find(i) == tracks_prev.end())
-                TrackFX_SetNamedConfigParm(i, 0, "chain_pdc_mode", "2");
-        for (auto&& i : tracks_diff)
-            TrackFX_SetNamedConfigParm(i, 0, "chain_pdc_mode", "1");
-    }
-    // calculate pdc
-    static std::unordered_set<TrackFx*> fx_set_to_disable;
-    fx_set_to_disable.clear();
-    for (auto&& path : paths)
-    {
-        int accumulating_pdc = 0;
-        for (auto&& tr : path)
-            accumulating_pdc = CalculateTrackPdc(tr, accumulating_pdc, fx_set_to_disable);
-    }
-
-    int num_actions = (int)(fx_set_to_disable.size() + fx_set_prev.size()) * 2;
-    // disable fx
-    PreventUIRefresh(num_actions);
-    bool need_undo = false;
-    int automation_temp_override = 0;
-    for (auto it = fx_set_to_disable.begin(); it != fx_set_to_disable.end();)
-    {
-        if (fx_set_prev.find(*it) == fx_set_prev.end() && !(*it)->getSafe())
-        {
-            if (!need_undo)
-            {
-                Undo_BeginBlock();
-                need_undo = true;
-                automation_temp_override = GetGlobalAutomationOverride();
-                SetGlobalAutomationOverride(6);
-            }
-            (*it)->disable();
-            ++it;
-        }
-        else
-        {
-            ++it;
-        }
-    }
-    // enable fx
-    for (auto it = fx_set_prev.begin(); it != fx_set_prev.end();)
-    {
-        if (fx_set_to_disable.find(*it) == fx_set_to_disable.end())
-        {
-            if (!(*it)->getEnabled() || (*it)->getParameterChange())
-            {
-                if (!need_undo)
-                {
-                    Undo_BeginBlock();
-                    need_undo = true;
-                    automation_temp_override = GetGlobalAutomationOverride();
-                    SetGlobalAutomationOverride(6);
-                }
-                if (!(*it)->getSafe())
-                    (*it)->enable();
-            }
-            if (!(*it)->getSafe())
-                it = fx_set_prev.erase(it);
-            else
-                ++it;
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // update state
-    fx_set_to_disable.insert(fx_set_prev.begin(), fx_set_prev.end());
-
-    if (!no_renaming)
-    {
-        for (auto&& i : possibleOrphans)
-        {
-            if (fx_set_to_disable.find(i) == fx_set_to_disable.end())
-            {
-                if (!need_undo)
-                {
-                    Undo_BeginBlock();
-                    need_undo = true;
-                    automation_temp_override = GetGlobalAutomationOverride();
-                    SetGlobalAutomationOverride(6);
-                }
-                i->enable();
-            }
-        }
-    }
-
-    if (need_undo)
-    {
-        SetGlobalAutomationOverride(automation_temp_override);
-        Undo_EndBlock("ReaLlm", UNDO_STATE_FX);
-    }
-
-    // store state
-    state = serializeFxSet(fx_set_to_disable);
-    SetProjExtState(0, "ak5k", "reallm", state.c_str());
-    SetProjExtState(0, "ak5k", "reallm_sz", std::to_string(state.size()).c_str());
-
     if (shutdown)
     {
-        shutdown = false;
-        // allocated_state_size = 0;
-        // delete[] state; // NOLINT
-        // state = nullptr;
-        no_renaming = false;
+        rebuildSnapshotAndEnableAllForShutdown(runtime, buf);
+        return;
     }
 
-    PreventUIRefresh(-num_actions);
+    runtime.ticksSinceBuild++;
+
+    if (runtime.phase == RuntimePhase::Idle)
+    {
+        if (!runtime.snapshotReady || runtime.ticksSinceBuild >= kBuildRefreshIntervalTicks)
+            beginSnapshotBuild(runtime);
+    }
+
+    if (runtime.phase == RuntimePhase::BuildSnapshot)
+        processSnapshotBuildBudget(runtime, kTrackScanBudgetPerTick, buf);
+
+    if (runtime.phase == RuntimePhase::Analyze)
+        buildAnalysisPlan(runtime, buf);
+
+    if (runtime.phase == RuntimePhase::Apply)
+        applyQueuedChanges(runtime, kFxApplyBudgetPerTick);
+
+    if (runtime.phase == RuntimePhase::Persist)
+        persistDesiredState(runtime);
 
     auto end_time = time_precise();
     auto time_diff = end_time - start_time;
     if (time_diff > 1)
         no_renaming = true;
-    // ShowConsoleMsg((std::to_string(end_time - start_time) + "\n").c_str());
 }
 
 const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";

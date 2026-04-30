@@ -13,6 +13,7 @@
       "stopAtEntry": false,
       "cwd": "${fileDirname}",
       "environment": [],
+      "preLaunchTask": "CMake: build and install"
     }
   ]
 }

@@ -1,5 +1,2 @@
-.vscode/*
-.vs/*
-.vscode/launch.json
 **/.DS_Store
 /build*
