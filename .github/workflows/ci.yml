@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  parity-build:
-    name: Parity ${{ matrix.name }}
+  build:
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
@@ -89,7 +89,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve vcpkg toolchain (Unix)
+      - name: Resolve vcpkg toolchain Unix
         if: runner.os != 'Windows'
         id: vcpkg-unix
         shell: bash
@@ -111,7 +111,7 @@ jobs:
           echo "Unable to locate vcpkg toolchain file on runner." >&2
           exit 1
 
-      - name: Resolve vcpkg toolchain (Windows)
+      - name: Resolve vcpkg toolchain Windows
         if: runner.os == 'Windows'
         id: vcpkg-windows
         shell: pwsh
@@ -138,7 +138,7 @@ jobs:
             build/vcpkg_installed
             build/_deps
           key: >-
-            parity-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json') }}
+            ${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json') }}
 
       - name: Setup Linux cross dependencies
         if: matrix.platform == 'linux'
@@ -155,7 +155,7 @@ jobs:
 
           install_deps() {
             local target_arch="$1"; shift
-            local native=("$@" php-cli qemu-user-binfmt)
+            local native=("$@" php-cli qemu-user-binfmt clang-tidy)
             local target=(
               libboost-dev libcurl4-openssl-dev libsqlite3-dev libssl-dev
               libxml2-dev zlib1g-dev
@@ -205,6 +205,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          "$(brew --prefix llvm)/bin/clang-tidy" --version
+
           if [ "$ARCH" = "arm64" ]; then
             echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
           else
@@ -221,11 +226,24 @@ jobs:
             sudo rm -rf /Library/Frameworks/Mono.framework
           fi
 
+      - name: Verify clang-tidy Linux
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: clang-tidy --version
+
       - name: Setup MSVC developer command prompt
         if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.msvc_arch }}
+
+      - name: Install clang-tidy Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          choco install llvm --no-progress -y
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          clang-tidy --version
 
       - name: Setup ARM64EC flags
         if: matrix.platform == 'windows' && matrix.arch == 'arm64ec'
@@ -234,7 +252,7 @@ jobs:
           'CFLAGS=-arm64EC' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           'CXXFLAGS=-arm64EC' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Configure (Unix parity)
+      - name: Configure Unix
         if: runner.os != 'Windows'
         env:
           VCPKG_TOOLCHAIN: ${{ steps.vcpkg-unix.outputs.toolchain }}
@@ -259,7 +277,7 @@ jobs:
 
           cmake "${cmake_args[@]}"
 
-      - name: Configure (Windows parity)
+      - name: Configure Windows
         if: runner.os == 'Windows'
         env:
           VCPKG_TOOLCHAIN: ${{ steps.vcpkg-windows.outputs.toolchain }}
@@ -270,22 +288,22 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
 
-      - name: Build (Unix parity)
+      - name: Build Unix
         if: runner.os != 'Windows'
         shell: bash
         run: cmake --build build
 
-      - name: Build (Windows parity)
+      - name: Build Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: cmake --build build
 
-      - name: Test (Unix parity)
+      - name: Test Unix
         if: runner.os != 'Windows' && !matrix.skip_tests
         shell: bash
         run: ctest --test-dir build --output-on-failure
 
-      - name: Test (Windows parity)
+      - name: Test Windows
         if: runner.os == 'Windows' && !matrix.skip_tests
         shell: pwsh
         run: ctest --test-dir build -C Release --output-on-failure
@@ -294,21 +312,21 @@ jobs:
         if: always() && matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
-          name: parity-${{ matrix.name }}
+          name: ${{ matrix.name }}
           path: build/reaper_*.so
 
       - name: Upload macOS artifacts
         if: always() && matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
-          name: parity-${{ matrix.name }}
+          name: ${{ matrix.name }}
           path: build/reaper_*.dylib
 
       - name: Upload Windows artifacts
         if: always() && matrix.platform == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: parity-${{ matrix.name }}
+          name: ${{ matrix.name }}
           path: |
             build/reaper_*.dll
             build/reaper_*.pdb
@@ -323,7 +341,7 @@ jobs:
       - name: Install clang-format
         run: sudo apt-get update && sudo apt-get install -y clang-format
 
-      - name: Check formatting (non-blocking)
+      - name: Check formatting non-blocking
         continue-on-error: true
         shell: bash
         run: |
@@ -340,7 +358,7 @@ jobs:
           clang-format --dry-run --Werror "${files[@]}"
 
   tooling-linux:
-    name: Tooling Linux (configure-build-test + clang-tidy)
+    name: Tooling Linux configure-build-test + clang-tidy
     runs-on: ubuntu-latest
     env:
       ARCH: x86_64
