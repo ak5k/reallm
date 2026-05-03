@@ -77,7 +77,7 @@ std::vector<ParameterChange> parameter_changes;
 
 class TrackFx
 {
-  public:
+public:
     TrackFx() : g(nullptr), tr(nullptr), fx_index(-1), isSafe(false), buf{}
     {
     }
@@ -227,7 +227,7 @@ class TrackFx
         this->hasParameterChange = hasParameterChange;
     }
 
-  private:
+private:
     GUID* g{};
     MediaTrack* tr;
     int fx_index;
@@ -248,7 +248,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
 std::string serializeFxSet(std::unordered_set<TrackFx*>& fx_to_disable);
 std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized);
 
-enum RuntimePhase : std::uint8_t
+enum RuntimePhase : uint8_t
 {
     Idle,
     BuildSnapshot,

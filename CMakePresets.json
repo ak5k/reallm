@@ -45,6 +45,22 @@
             }
         },
         {
+            "name": "linux-clang-debug",
+            "displayName": "Linux LLVM Clang Debug",
+            "inherits": "linux-clang",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "linux-clang-release",
+            "displayName": "Linux LLVM Clang Release",
+            "inherits": "linux-clang",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
             "name": "macos-clang",
             "displayName": "macOS Clang",
             "inherits": "base",
@@ -57,6 +73,22 @@
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++"
+            }
+        },
+        {
+            "name": "macos-clang-debug",
+            "displayName": "macOS Clang Debug",
+            "inherits": "macos-clang",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "macos-clang-release",
+            "displayName": "macOS Clang Release",
+            "inherits": "macos-clang",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
@@ -73,6 +105,22 @@
                 "CMAKE_C_COMPILER": "cl",
                 "CMAKE_CXX_COMPILER": "cl"
             }
+        },
+        {
+            "name": "windows-msvc-ninja-debug",
+            "displayName": "Windows MSVC Ninja x64 Debug",
+            "inherits": "windows-msvc-ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-msvc-ninja-release",
+            "displayName": "Windows MSVC Ninja x64 Release",
+            "inherits": "windows-msvc-ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
     ],
     "buildPresets": [
@@ -88,33 +136,27 @@
         },
         {
             "name": "windows-msvc-ninja-debug",
-            "configurePreset": "windows-msvc-ninja",
-            "configuration": "Debug"
+            "configurePreset": "windows-msvc-ninja-debug"
         },
         {
             "name": "windows-msvc-ninja-release",
-            "configurePreset": "windows-msvc-ninja",
-            "configuration": "Release"
+            "configurePreset": "windows-msvc-ninja-release"
         },
         {
             "name": "linux-clang-debug",
-            "configurePreset": "linux-clang",
-            "configuration": "Debug"
+            "configurePreset": "linux-clang-debug"
         },
         {
             "name": "linux-clang-release",
-            "configurePreset": "linux-clang",
-            "configuration": "Release"
+            "configurePreset": "linux-clang-release"
         },
         {
             "name": "macos-clang-debug",
-            "configurePreset": "macos-clang",
-            "configuration": "Debug"
+            "configurePreset": "macos-clang-debug"
         },
         {
             "name": "macos-clang-release",
-            "configurePreset": "macos-clang",
-            "configuration": "Release"
+            "configurePreset": "macos-clang-release"
         }
     ],
     "testPresets": [
@@ -125,18 +167,15 @@
         },
         {
             "name": "windows-msvc-ninja-debug",
-            "configurePreset": "windows-msvc-ninja",
-            "configuration": "Debug"
+            "configurePreset": "windows-msvc-ninja-debug"
         },
         {
             "name": "linux-clang-debug",
-            "configurePreset": "linux-clang",
-            "configuration": "Debug"
+            "configurePreset": "linux-clang-debug"
         },
         {
             "name": "macos-clang-debug",
-            "configurePreset": "macos-clang",
-            "configuration": "Debug"
+            "configurePreset": "macos-clang-debug"
         }
     ]
 }

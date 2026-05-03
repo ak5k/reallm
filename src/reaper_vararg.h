@@ -15,6 +15,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
 }
 */
 
+#include <cstdint>
 #include <tuple>
 
 template <typename T>
@@ -51,7 +52,7 @@ struct ReaScriptAPI<R (*)(Args...)>
         }
     }
 
-  private:
+private:
     template <size_t I>
     using NthType = typename std::tuple_element<I, std::tuple<Args...>>::type;
 

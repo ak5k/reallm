@@ -4,7 +4,7 @@
 template <typename Node>
 class Network
 {
-  public:
+public:
     void addNode(Node node)
     {
         nodes[node] = std::unordered_set<Node>{};
@@ -25,6 +25,6 @@ class Network
         nodes.clear();
     }
 
-  private:
+private:
     std::unordered_map<Node, std::unordered_set<Node>> nodes{};
 };

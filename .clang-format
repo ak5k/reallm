@@ -6,3 +6,4 @@ AllowShortFunctionsOnASingleLine: None
 BreakBeforeBraces: Allman
 PointerAlignment: Left
 BreakTemplateDeclarations: Yes
+AccessModifierOffset: -4
