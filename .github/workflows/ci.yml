@@ -462,8 +462,6 @@ jobs:
   sanitizer-tsan:
     name: Sanitizer TSAN
     runs-on: ubuntu-latest
-    needs:
-      - sanitizer-asan-ubsan-lsan
     env:
       ARCH: x86_64
       VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
@@ -526,8 +524,6 @@ jobs:
   sanitizer-rtsan:
     name: Sanitizer RTSAN
     runs-on: ubuntu-latest
-    needs:
-      - sanitizer-tsan
     env:
       ARCH: x86_64
       VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
