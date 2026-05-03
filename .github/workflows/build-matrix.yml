@@ -58,7 +58,7 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
