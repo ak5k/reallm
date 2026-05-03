@@ -41,40 +41,21 @@ FetchContent_Declare(reaper_sdk
 FetchContent_Declare(googletest
     GIT_REPOSITORY https://github.com/google/googletest
     GIT_TAG        v1.17.0
-    GIT_SUBMODULES ""
-    GIT_SUBMODULES_RECURSE FALSE
     SYSTEM
 )
 
 # Prevent clang-tidy from running on third-party targets
-set(_project_clang_tidy "")
-if(CMAKE_GENERATOR MATCHES "Ninja")
-  if(CMAKE_CXX_CLANG_TIDY)
-    set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
-  else()
-    set(_project_clang_tidy "clang-tidy")
-  endif()
-endif()
+set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
 unset(CMAKE_CXX_CLANG_TIDY)
 FetchContent_MakeAvailable(WDL reaper_sdk googletest)
+set(CMAKE_CXX_CLANG_TIDY "${_project_clang_tidy}")
 
 # symlink WDL to reaper-sdk
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-            # source
             "${wdl_SOURCE_DIR}/WDL"
-            # target
             "${reaper_sdk_SOURCE_DIR}/WDL"
 )
-
-if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-    CACHE STRING "")
-endif()
-
-if(DEFINED ENV{VCPKG_DEFAULT_TRIPLET} AND NOT DEFINED VCPKG_TARGET_TRIPLET)
-  set(VCPKG_TARGET_TRIPLET "$ENV{VCPKG_DEFAULT_TRIPLET}" CACHE STRING "")
-endif()
 
 set(WDL_ROOT_DIR "${wdl_SOURCE_DIR}")
 
@@ -100,7 +81,13 @@ add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
 enable_testing()
 include(GoogleTest)
-add_subdirectory(src)
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+list(FILTER SOURCES EXCLUDE REGEX "_test\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "main\\.cpp$")
+target_sources(${PROJECT_NAME}_lib PRIVATE ${SOURCES})
+target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/main.cpp")
+
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
 
@@ -111,13 +98,11 @@ if(_test_sources)
     gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()
 
-if(_project_clang_tidy AND CMAKE_GENERATOR MATCHES "Ninja")
   set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
   set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
   if(TARGET ${PROJECT_NAME}_tests)
     set_target_properties(${PROJECT_NAME}_tests PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
   endif()
-endif()
 
 target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
     REALLM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
@@ -197,7 +182,7 @@ else()
   set(ARCH_NAME ${CMAKE_SYSTEM_PROCESSOR})
 endif()
 
-STRING(TOLOWER "${ARCH_NAME}" ARCH_NAME)
+string(TOLOWER "${ARCH_NAME}" ARCH_NAME)
 set_target_properties(${PROJECT_NAME} PROPERTIES
   PREFIX "" # disable the "lib" prefix
   OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
@@ -232,7 +217,7 @@ endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL "8")
   set(CPUBITS "64")
-else(CMAKE_SIZEOF_VOID_P EQUAL "4")
+else()
   set(CPUBITS "32")
 endif()
 
@@ -245,18 +230,14 @@ endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-                # source
                 "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-                # target
                 "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt")
     set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt")
 endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-                # source
                 "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-                # target
                 "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt")
 endif()
