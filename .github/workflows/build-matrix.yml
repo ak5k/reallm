@@ -136,37 +136,47 @@ jobs:
         run: |
           set -euo pipefail
           configure_apt_sources() {
-            if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
-              # Ubuntu 24.04+ runners use deb822 sources. Keep native repos on amd64/i386
-              # and add a dedicated ports source for foreign ARM architectures.
-              tmp_file="$(mktemp)"
-              awk '
-              /^Architectures:/ { print "Architectures: amd64 i386"; next }
-              { print }
-              ' /etc/apt/sources.list.d/ubuntu.sources > "$tmp_file"
-              sudo mv "$tmp_file" /etc/apt/sources.list.d/ubuntu.sources
+            local target_arch="$1"
+            . /etc/os-release
 
-              . /etc/os-release
+            if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+              # Keep native packages on archive.ubuntu.com and use ports only for ARM targets.
+              # Avoid security/backports suites for cross-arch parity on ubuntu-latest.
               printf '%s\n' \
                 'Types: deb' \
-                'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
-                "Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates ${VERSION_CODENAME}-backports ${VERSION_CODENAME}-security" \
+                'Architectures: amd64 i386' \
+                'URIs: http://archive.ubuntu.com/ubuntu/' \
+                "Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates" \
                 'Components: main universe restricted multiverse' \
-                'Architectures: armhf arm64' \
                 'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
-                | sudo tee /etc/apt/sources.list.d/ubuntu-ports.sources > /dev/null
+                | sudo tee /etc/apt/sources.list.d/ubuntu.sources > /dev/null
+
+              sudo rm -f /etc/apt/sources.list.d/ubuntu-ports.sources
+              if [[ "$target_arch" =~ ^(arm64|armhf)$ ]]; then
+                printf '%s\n' \
+                  'Types: deb' \
+                  "Architectures: ${target_arch}" \
+                  'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
+                  "Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates" \
+                  'Components: main universe restricted multiverse' \
+                  'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+                  | sudo tee /etc/apt/sources.list.d/ubuntu-ports.sources > /dev/null
+              fi
             elif [ -f /etc/apt/sources.list ]; then
-              sudo sed -i '/arch=/! s/^deb/deb [arch=amd64,i386]/' /etc/apt/sources.list
-              awk '
-              $3 !~ /ubuntu\.com/ { next }
-              $1 == "deb" {
-                $2 = "[arch=armhf,arm64]";
-                $3 = "http://ports.ubuntu.com/ubuntu-ports/"
-              } 1' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list > /dev/null
+              printf '%s\n' \
+                "deb [arch=amd64,i386] http://archive.ubuntu.com/ubuntu/ ${VERSION_CODENAME} main universe restricted multiverse" \
+                "deb [arch=amd64,i386] http://archive.ubuntu.com/ubuntu/ ${VERSION_CODENAME}-updates main universe restricted multiverse" \
+                | sudo tee /etc/apt/sources.list > /dev/null
+
+              sudo rm -f /etc/apt/sources.list.d/ports.list
+              if [[ "$target_arch" =~ ^(arm64|armhf)$ ]]; then
+                printf '%s\n' \
+                  "deb [arch=${target_arch}] http://ports.ubuntu.com/ubuntu-ports/ ${VERSION_CODENAME} main universe restricted multiverse" \
+                  "deb [arch=${target_arch}] http://ports.ubuntu.com/ubuntu-ports/ ${VERSION_CODENAME}-updates main universe restricted multiverse" \
+                  | sudo tee /etc/apt/sources.list.d/ports.list > /dev/null
+              fi
             fi
           }
-
-          configure_apt_sources
 
           install_deps() {
             local target_arch="$1"; shift
@@ -181,6 +191,8 @@ jobs:
             fi
 
             sudo dpkg --add-architecture "$target_arch"
+            configure_apt_sources "$target_arch"
+            sudo rm -rf /var/lib/apt/lists/*
             sudo apt-get update -qq
             sudo apt-get install -y -qq aptitude > /dev/null
             sudo aptitude install -yR "${native[@]}" "${target[@]/%/:$target_arch}" > /dev/null
