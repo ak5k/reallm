@@ -108,17 +108,21 @@ if(_test_sources)
     gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()
 
-set_target_properties(
-    ${PROJECT_NAME}_lib
-    ${PROJECT_NAME}
-    PROPERTIES CXX_CLANG_TIDY "clang-tidy"
-)
-if(TARGET ${PROJECT_NAME}_tests)
+list(LENGTH CMAKE_OSX_ARCHITECTURES _osx_arch_count)
+if(NOT _osx_arch_count GREATER 1)
     set_target_properties(
-        ${PROJECT_NAME}_tests
+        ${PROJECT_NAME}_lib
+        ${PROJECT_NAME}
         PROPERTIES CXX_CLANG_TIDY "clang-tidy"
     )
+    if(TARGET ${PROJECT_NAME}_tests)
+        set_target_properties(
+            ${PROJECT_NAME}_tests
+            PROPERTIES CXX_CLANG_TIDY "clang-tidy"
+        )
+    endif()
 endif()
+unset(_osx_arch_count)
 
 target_compile_definitions(
     ${PROJECT_NAME}_lib
