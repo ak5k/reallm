@@ -197,7 +197,7 @@ if(MSVC)
 else()
     target_compile_options(
         ${PROJECT_NAME}_lib
-        PRIVATE
+        PUBLIC
             -fsigned-char
             -fstack-protector-strong
             -fdiagnostics-color
