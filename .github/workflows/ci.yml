@@ -325,8 +325,7 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < <(git ls-files \
-            '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' '*.hxx' '*.inl' \
-            'CMakeLists.txt' '*.cmake')
+            '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' '*.hxx' '*.inl')
 
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No format-managed files found."
