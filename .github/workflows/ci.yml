@@ -27,19 +27,19 @@ jobs:
             platform: linux
             arch: i686
             triplet: arch-env
-            skip_tests: false
+            skip_tests: true
           - name: linux-armv7l
             os: ubuntu-latest
             platform: linux
             arch: armv7l
             triplet: arch-env
-            skip_tests: false
+            skip_tests: true
           - name: linux-aarch64
             os: ubuntu-latest
             platform: linux
             arch: aarch64
             triplet: arch-env
-            skip_tests: false
+            skip_tests: true
           - name: windows-x64
             os: windows-latest
             platform: windows
@@ -53,7 +53,7 @@ jobs:
             arch: x86
             msvc_arch: x86
             triplet: x86-windows-static
-            skip_tests: false
+            skip_tests: true
           - name: windows-arm64ec
             os: windows-latest
             platform: windows

@@ -105,7 +105,7 @@ if(_test_sources)
         ${PROJECT_NAME}_tests
         PRIVATE ${PROJECT_NAME}_lib GTest::gtest_main
     )
-    gtest_discover_tests(${PROJECT_NAME}_tests)
+    gtest_discover_tests(${PROJECT_NAME}_tests DISCOVERY_MODE PRE_TEST)
 endif()
 
 function(configure_target_clang_tidy target_name tidy_command)
