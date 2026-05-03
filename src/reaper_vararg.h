@@ -1,4 +1,4 @@
-// NOLINT
+// NOLINTBEGIN
 // Extracted from ReaPack's and ReaImGui's source code (LGPL v3)
 
 /* Usage example:
@@ -70,3 +70,4 @@ auto InvokeReaScriptAPI(void** argv, int argc) -> const void*
 {
     return ReaScriptAPI<decltype(function)>::applyVarArg(function, argv, argc);
 }
+// NOLINTEND

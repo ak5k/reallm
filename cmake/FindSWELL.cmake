@@ -2,11 +2,18 @@ if(SWELL_FOUND)
   return()
 endif()
 
-find_package(WDL REQUIRED)
+set(_SWELL_SEARCH_PATHS)
+if(DEFINED WDL_DIR)
+  list(APPEND _SWELL_SEARCH_PATHS "${WDL_DIR}")
+endif()
+if(DEFINED WDL_ROOT_DIR)
+  list(APPEND _SWELL_SEARCH_PATHS "${WDL_ROOT_DIR}/WDL")
+endif()
+list(APPEND _SWELL_SEARCH_PATHS "${CMAKE_SOURCE_DIR}/lib/WDL")
 
 find_path(SWELL_INCLUDE_DIR
   NAMES swell/swell.h
-  PATHS ${WDL_DIR}
+  PATHS ${_SWELL_SEARCH_PATHS}
   NO_DEFAULT_PATH
 )
 mark_as_advanced(SWELL_INCLUDE_DIR)

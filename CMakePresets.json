@@ -9,7 +9,7 @@
         {
             "name": "base",
             "hidden": true,
-            "binaryDir": "${sourceDir}/out/${presetName}",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
@@ -18,7 +18,7 @@
             "name": "windows-msvc",
             "displayName": "Windows MSVC x64",
             "inherits": "base",
-            "generator": "Visual Studio 17 2022",
+            "generator": "Visual Studio 18 2026",
             "architecture": {
                 "value": "x64",
                 "strategy": "set"
@@ -27,21 +27,6 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
-            }
-        },
-        {
-            "name": "windows-msvc-ninja",
-            "displayName": "Windows MSVC x64 (Ninja)",
-            "inherits": "base",
-            "generator": "Ninja",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl"
             }
         },
         {
@@ -73,6 +58,21 @@
                 "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++"
             }
+        },
+        {
+            "name": "windows-msvc-ninja",
+            "displayName": "Windows MSVC Ninja x64",
+            "inherits": "base",
+            "generator": "Ninja",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_CXX_COMPILER": "cl"
+            }
         }
     ],
     "buildPresets": [
@@ -84,6 +84,16 @@
         {
             "name": "windows-msvc-release",
             "configurePreset": "windows-msvc",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-msvc-ninja-debug",
+            "configurePreset": "windows-msvc-ninja",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-msvc-ninja-release",
+            "configurePreset": "windows-msvc-ninja",
             "configuration": "Release"
         },
         {
@@ -111,6 +121,11 @@
         {
             "name": "windows-msvc-debug",
             "configurePreset": "windows-msvc",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-msvc-ninja-debug",
+            "configurePreset": "windows-msvc-ninja",
             "configuration": "Debug"
         },
         {

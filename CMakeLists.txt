@@ -47,21 +47,16 @@ FetchContent_Declare(googletest
 )
 
 # Prevent clang-tidy from running on third-party targets
-set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
+set(_project_clang_tidy "")
+if(CMAKE_GENERATOR MATCHES "Ninja")
+  if(CMAKE_CXX_CLANG_TIDY)
+    set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
+  else()
+    set(_project_clang_tidy "clang-tidy")
+  endif()
+endif()
 unset(CMAKE_CXX_CLANG_TIDY)
 FetchContent_MakeAvailable(WDL reaper_sdk googletest)
-
-if(MSVC)
-    target_compile_options(gtest PRIVATE /W0)
-    target_compile_options(gtest_main PRIVATE /W0)
-    target_compile_options(gmock PRIVATE /W0)
-    target_compile_options(gmock_main PRIVATE /W0)
-else()
-    target_compile_options(gtest PRIVATE -w)
-    target_compile_options(gtest_main PRIVATE -w)
-    target_compile_options(gmock PRIVATE -w)
-    target_compile_options(gmock_main PRIVATE -w)
-endif()
 
 # symlink WDL to reaper-sdk
 execute_process(
@@ -90,15 +85,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(WDL REQUIRED)
 
-if(NOT WIN32)
-  find_package(SWELL REQUIRED)
-endif()
-
 target_link_libraries(reaper-sdk INTERFACE WDL::WDL)
-
-if(SWELL_FOUND)
-  target_link_libraries(reaper-sdk INTERFACE SWELL::swell)
-endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL     ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE        ON)
@@ -116,15 +103,20 @@ include(GoogleTest)
 add_subdirectory(src)
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
-if(_project_clang_tidy)
-    set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
-endif()
 
 file(GLOB_RECURSE _test_sources CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*_test.cpp")
 if(_test_sources)
     add_executable(${PROJECT_NAME}_tests ${_test_sources})
     target_link_libraries(${PROJECT_NAME}_tests PRIVATE ${PROJECT_NAME}_lib GTest::gtest_main)
     gtest_discover_tests(${PROJECT_NAME}_tests)
+endif()
+
+if(_project_clang_tidy AND CMAKE_GENERATOR MATCHES "Ninja")
+  set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+  set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+  if(TARGET ${PROJECT_NAME}_tests)
+    set_target_properties(${PROJECT_NAME}_tests PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+  endif()
 endif()
 
 target_compile_definitions(${PROJECT_NAME}_lib PRIVATE

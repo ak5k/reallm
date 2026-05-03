@@ -248,7 +248,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
 std::string serializeFxSet(std::unordered_set<TrackFx*>& fx_to_disable);
 std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized);
 
-enum class RuntimePhase
+enum RuntimePhase : std::uint8_t
 {
     Idle,
     BuildSnapshot,
@@ -378,7 +378,7 @@ void appendTrackToPendingSnapshot(RuntimeState& rt, int trackIndex, char* buf)
         if (trackIndex == num_tracks && include_monitoring_fx && idx >= TrackFX_GetCount(tr))
             idx = idx - TrackFX_GetCount(tr) + 0x1000000;
 
-        auto g = TrackFX_GetFXGUID(tr, idx);
+        auto* g = TrackFX_GetFXGUID(tr, idx);
         rt.pendingFxMap[g] = TrackFx(g, tr, idx);
 
         TrackFX_GetFXName(tr, idx, buf, BUFSIZ);
@@ -699,6 +699,7 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
     {
         MediaTrack* destinationTrack{nullptr};
         destinationTrack =
+            // NOLINTNEXTLINE
             (MediaTrack*)(UINT_PTR)GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
         bool isSendMuted = (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
         if (!isSendMuted)
@@ -818,7 +819,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
         // classic pdc
         if (pdc_mode == 0 && keep_pdc)
         {
-            fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : (fx_pdc / bsize + 1) * bsize;
+            fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : ((fx_pdc / bsize) + 1) * bsize;
             if (pdc + fx_pdc > pdc_limit && !fx_map[g].getSafe())
                 fx_set.insert(&fx_map[g]);
             else
@@ -829,7 +830,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
         if (pdc_mode == 1 && keep_pdc)
         {
             tr_pdc += fx_pdc;
-            auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
+            auto temp = tr_pdc % bsize == 0 ? tr_pdc : ((tr_pdc / bsize) + 1) * bsize;
             if (pdc + temp > pdc_limit && !fx_map[g].getSafe())
             {
                 tr_pdc -= fx_pdc;
@@ -850,7 +851,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
     }
     if (pdc_mode == 1)
     {
-        auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
+        auto temp = tr_pdc % bsize == 0 ? tr_pdc : ((tr_pdc / bsize) + 1) * bsize;
         pdc += temp;
     }
 
@@ -1191,6 +1192,7 @@ const char* defstring_GetVersion =
 void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut,
                 int commitOut_sz)
 {
+    (void)commitOut_sz; // unused parameter
     *majorOut = REALLM_VERSION_MAJOR;
     *minorOut = REALLM_VERSION_MINOR;
     *patchOut = REALLM_VERSION_PATCH;
