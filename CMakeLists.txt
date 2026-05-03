@@ -1,32 +1,24 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(reallm VERSION 0.0.0 LANGUAGES C CXX)
-
-find_package(Git)
+set(_version "0.8.0")
+find_package(Git QUIET)
 if(GIT_FOUND)
-  execute_process(
-    COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_LATEST_TAG
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-  if(NOT "${GIT_LATEST_TAG}" STREQUAL "")
-  string(REGEX REPLACE "[^0-9.]" "" GIT_LATEST_TAG ${GIT_LATEST_TAG})
-    project(${PROJECT_NAME} VERSION ${GIT_LATEST_TAG} LANGUAGES C CXX)
-  endif()
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE _git_tag
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(_git_tag MATCHES "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?")
+        string(REGEX REPLACE "[^0-9.]" "" _version "${_git_tag}")
+    endif()
 endif()
-message("Project version: ${PROJECT_VERSION}")
 
-if(DEFINED ENV{APPVEYOR})
-    set(CMAKE_PROJECT_VERSION_TWEAK $ENV{APPVEYOR_BUILD_NUMBER})
-    set(CMAKE_PROJECT_VERSION_COMMIT $ENV{APPVEYOR_REPO_COMMIT})
-else()
-    set(CMAKE_PROJECT_VERSION_TWEAK -1)
-    set(CMAKE_PROJECT_VERSION_COMMIT a)
-endif()
-set(CMAKE_PROJECT_VERSION_COMMIT "\"${CMAKE_PROJECT_VERSION_COMMIT}\"")
+project(reallm VERSION ${_version} LANGUAGES C CXX)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -34,28 +26,42 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 
-FetchContent_Declare(GSL
-    GIT_REPOSITORY "https://github.com/microsoft/GSL"
-    GIT_TAG        "origin/main"
-    GIT_SUBMODULES ""
-    GIT_SUBMODULES_RECURSE FALSE
-)
-
 FetchContent_Declare(WDL
     GIT_REPOSITORY https://github.com/justinfrankel/WDL
-    GIT_TAG        "origin/main" # or specify a tag or branch here
-    GIT_SUBMODULES ""
-    GIT_SUBMODULES_RECURSE FALSE
+    GIT_TAG        "origin/main"
+    SYSTEM
 )
 
 FetchContent_Declare(reaper_sdk
     GIT_REPOSITORY https://github.com/justinfrankel/reaper-sdk
-    GIT_TAG        "origin/main" # or specify a tag or branch here
-    GIT_SUBMODULES ""
-    GIT_SUBMODULES_RECURSE FALSE
+    GIT_TAG        "origin/main"
+    SYSTEM
 )
 
-FetchContent_MakeAvailable(GSL WDL reaper_sdk)
+FetchContent_Declare(googletest
+    GIT_REPOSITORY https://github.com/google/googletest
+    GIT_TAG        v1.17.0
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
+    SYSTEM
+)
+
+# Prevent clang-tidy from running on third-party targets
+set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
+unset(CMAKE_CXX_CLANG_TIDY)
+FetchContent_MakeAvailable(WDL reaper_sdk googletest)
+
+if(MSVC)
+    target_compile_options(gtest PRIVATE /W0)
+    target_compile_options(gtest_main PRIVATE /W0)
+    target_compile_options(gmock PRIVATE /W0)
+    target_compile_options(gmock_main PRIVATE /W0)
+else()
+    target_compile_options(gtest PRIVATE -w)
+    target_compile_options(gtest_main PRIVATE -w)
+    target_compile_options(gmock PRIVATE -w)
+    target_compile_options(gmock_main PRIVATE -w)
+endif()
 
 # symlink WDL to reaper-sdk
 execute_process(
@@ -77,14 +83,8 @@ endif()
 
 set(WDL_ROOT_DIR "${wdl_SOURCE_DIR}")
 
-set(header_paths
-  "${gsl_SOURCE_DIR}/include"
-  "${reaper_sdk_SOURCE_DIR}/sdk"
-)
-
 add_library(reaper-sdk IMPORTED INTERFACE)
-target_include_directories(reaper-sdk INTERFACE ${header_paths})
-target_link_libraries(reaper-sdk INTERFACE GSL)
+target_include_directories(reaper-sdk SYSTEM INTERFACE "${reaper_sdk_SOURCE_DIR}/sdk")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -109,15 +109,29 @@ if(VCPKG_TOOLCHAIN)
   set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
 endif()
 
+add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
+enable_testing()
+include(GoogleTest)
 add_subdirectory(src)
-target_link_libraries(${PROJECT_NAME} PRIVATE reaper-sdk)
+target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
+if(_project_clang_tidy)
+    set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+endif()
 
-configure_file(
-  "${PROJECT_SOURCE_DIR}/config.h.in"
-  "${PROJECT_BINARY_DIR}/config.h"
+file(GLOB_RECURSE _test_sources CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*_test.cpp")
+if(_test_sources)
+    add_executable(${PROJECT_NAME}_tests ${_test_sources})
+    target_link_libraries(${PROJECT_NAME}_tests PRIVATE ${PROJECT_NAME}_lib GTest::gtest_main)
+    gtest_discover_tests(${PROJECT_NAME}_tests)
+endif()
+
+target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
+    REALLM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    REALLM_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    REALLM_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
 
 if(WIN32)
   foreach(arg
@@ -147,6 +161,9 @@ if(WIN32)
     $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
   )
 
+  target_compile_options(${PROJECT_NAME}_lib PRIVATE /W3 /WX /wd4996 /wd4244 /wd4267 /wd4305)
+  target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
+
   if(NOT CMAKE_PROJECT_VERSION_TWEAK EQUAL "1")
     add_link_options(
       # Remove unreferenced code
@@ -160,24 +177,10 @@ if(WIN32)
     )
   endif()
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -fsigned-char -fstack-protector-strong -fdiagnostics-color)
-endif()
-
-
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
-
-if(WIN32)
   target_compile_options(
-    ${PROJECT_NAME} 
-      PRIVATE 
-      /W3 /WX /wd4996
-      )
-  target_compile_definitions(${PROJECT_NAME} PRIVATE NOMINMAX UNICODE)
-else()
-  target_compile_options(
-    ${PROJECT_NAME}
-      PRIVATE
-      -Wall -Wextra -Wpedantic 
+    ${PROJECT_NAME}_lib PRIVATE
+    -fsigned-char -fstack-protector-strong -fdiagnostics-color
+    -Wall -Wextra -Werror -Wno-conversion -Wno-sign-conversion
   )
 endif()
 

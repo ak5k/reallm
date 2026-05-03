@@ -1,5 +1,6 @@
-target_sources(${PROJECT_NAME}
-    PRIVATE
-        main.cpp
-        reallm.cpp
-        )
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+list(FILTER SOURCES EXCLUDE REGEX "_test\\.cpp$")
+list(FILTER SOURCES EXCLUDE REGEX "main\\.cpp$")
+
+target_sources(${PROJECT_NAME}_lib PRIVATE ${SOURCES})
+target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
