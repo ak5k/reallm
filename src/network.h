@@ -5,6 +5,8 @@ template <typename Node>
 class Network
 {
 public:
+    Network() noexcept = default;
+
     void addNode(Node node)
     {
         nodes[node] = std::unordered_set<Node>{};
