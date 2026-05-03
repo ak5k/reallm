@@ -98,11 +98,11 @@ if(_test_sources)
     gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()
 
-  set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
-  set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
-  if(TARGET ${PROJECT_NAME}_tests)
-    set_target_properties(${PROJECT_NAME}_tests PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
-  endif()
+    set_target_properties(${PROJECT_NAME}_lib PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+    set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+    if(TARGET ${PROJECT_NAME}_tests)
+      set_target_properties(${PROJECT_NAME}_tests PROPERTIES CXX_CLANG_TIDY "${_project_clang_tidy}")
+    endif()
 
 target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
     REALLM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
