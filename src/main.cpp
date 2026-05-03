@@ -9,8 +9,8 @@
 #include <WDL/wdltypes.h>
 #include <reaper_plugin_functions.h>
 
-#define REQUIRED_API(name) {(void**)&name, #name, true}
-#define OPTIONAL_API(name) {(void**)&name, #name, false}
+#define REQUIRED_API(name) {(void**)&(name), #name, true}
+#define OPTIONAL_API(name) {(void**)&(name), #name, false}
 
 static bool loadAPI(void* (*getFunc)(const char*))
 {

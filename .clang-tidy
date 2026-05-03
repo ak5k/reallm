@@ -1,9 +1,13 @@
 Checks: >
+  bugprone-*, 
   clang-analyzer-*,
   concurrency-*,
   misc-*,
   performance-*,
   readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-nondeterministic-pointer-iteration-order,
   -clang-analyzer-cplusplus.NewDeleteLeaks,
   -clang-analyzer-optin.performance.Padding,
   -clang-analyzer-security.FloatLoopCounter,

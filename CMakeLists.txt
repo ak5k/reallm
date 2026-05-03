@@ -47,11 +47,15 @@ FetchContent_Declare(
     SYSTEM
 )
 
-# Prevent clang-tidy from running on third-party targets
-set(_project_clang_tidy "${CMAKE_CXX_CLANG_TIDY}")
+# Always run clang-tidy for project-owned targets only.
+# Prevent clang-tidy from running on third-party targets brought in by FetchContent.
 unset(CMAKE_CXX_CLANG_TIDY)
 FetchContent_MakeAvailable(WDL reaper_sdk googletest)
+set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+
+# Re-enable clang-tidy for project-owned targets created after dependencies.
 set(CMAKE_CXX_CLANG_TIDY "${_project_clang_tidy}")
+set(CMAKE_CXX_CLANG_TIDY "${_project_clang_tidy}" CACHE STRING "" FORCE)
 
 # symlink WDL to reaper-sdk
 execute_process(
