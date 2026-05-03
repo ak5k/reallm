@@ -41,21 +41,21 @@ jobs:
             triplet: arch-env
             skip_tests: false
           - name: windows-x64
-            os: windows-2022
+            os: windows-latest
             platform: windows
             arch: x64
             msvc_arch: x64
             triplet: x64-windows-static
             skip_tests: false
           - name: windows-x86
-            os: windows-2022
+            os: windows-latest
             platform: windows
             arch: x86
             msvc_arch: x86
             triplet: x86-windows-static
             skip_tests: false
           - name: windows-arm64ec
-            os: windows-2022
+            os: windows-latest
             platform: windows
             arch: arm64ec
             msvc_arch: amd64_arm64
@@ -213,13 +213,10 @@ jobs:
         with:
           arch: ${{ matrix.msvc_arch }}
 
-      - name: Install clang-tidy Windows
+      - name: Verify clang-tidy Windows
         if: matrix.platform == 'windows'
         shell: pwsh
-        run: |
-          choco install llvm --no-progress -y
-          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          clang-tidy --version
+        run: clang-tidy --version
 
       - name: Setup ARM64EC flags
         if: matrix.platform == 'windows' && matrix.arch == 'arm64ec'
