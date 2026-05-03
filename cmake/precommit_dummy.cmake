@@ -1,4 +1,4 @@
-set(  DUMMY_SOURCES   a.cpp    b.cpp   c.cpp)
-if( WIN32 )
-message( STATUS "dummy" )
-endif( )
+set(DUMMY_SOURCES x.cpp y.cpp z.cpp)
+if(WIN32)
+    message(STATUS "dummy2")
+endif()
