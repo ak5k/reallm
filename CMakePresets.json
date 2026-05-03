@@ -45,8 +45,8 @@
             }
         },
         {
-            "name": "linux-gcc",
-            "displayName": "Linux GCC",
+            "name": "linux-clang",
+            "displayName": "Linux LLVM Clang",
             "inherits": "base",
             "generator": "Ninja",
             "condition": {
@@ -55,8 +55,8 @@
                 "rhs": "Linux"
             },
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "gcc",
-                "CMAKE_CXX_COMPILER": "g++"
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
             }
         },
         {
@@ -87,13 +87,13 @@
             "configuration": "Release"
         },
         {
-            "name": "linux-gcc-debug",
-            "configurePreset": "linux-gcc",
+            "name": "linux-clang-debug",
+            "configurePreset": "linux-clang",
             "configuration": "Debug"
         },
         {
-            "name": "linux-gcc-release",
-            "configurePreset": "linux-gcc",
+            "name": "linux-clang-release",
+            "configurePreset": "linux-clang",
             "configuration": "Release"
         },
         {
@@ -114,8 +114,8 @@
             "configuration": "Debug"
         },
         {
-            "name": "linux-gcc-debug",
-            "configurePreset": "linux-gcc",
+            "name": "linux-clang-debug",
+            "configurePreset": "linux-clang",
             "configuration": "Debug"
         },
         {
