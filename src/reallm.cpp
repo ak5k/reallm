@@ -11,8 +11,7 @@
 #include <WDL/wdltypes.h>
 #include <reaper_plugin_functions.h>
 
-// NOLINTBEGIN(bugprone-throwing-static-initialization)
-
+// NOLINTBEGIN(bugprone-throwing-static-initialization,bugprone-unused-local-non-trivial-variable)
 namespace reallm
 {
 
@@ -1260,5 +1259,4 @@ void Register()
                     reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
 }
 } // namespace reallm
-
-// NOLINTEND(bugprone-throwing-static-initialization)
+// NOLINTEND(bugprone-throwing-static-initialization,bugprone-unused-local-non-trivial-variable)
