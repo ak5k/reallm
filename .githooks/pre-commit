@@ -32,7 +32,7 @@ fi
 
 if [ ${#cmake_files[@]} -gt 0 ]; then
     if command -v gersemi >/dev/null 2>&1; then
-        gersemi "${cmake_files[@]}"
+        gersemi -i "${cmake_files[@]}"
         git add -- "${cmake_files[@]}"
     else
         echo "warning: gersemi not found; skipping CMake formatting" >&2
