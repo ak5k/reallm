@@ -1,0 +1,359 @@
+name: Build Matrix Reusable
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        description: JSON object for strategy.matrix
+        required: true
+        type: string
+      checkout_ref:
+        description: Optional git ref to checkout
+        required: false
+        default: ''
+        type: string
+      build_type:
+        description: CMake build type for Unix builds
+        required: false
+        default: Debug
+        type: string
+      windows_preset:
+        description: CMake preset used for Windows configure/build
+        required: false
+        default: windows-msvc-ninja-debug
+        type: string
+      windows_artifact_dir:
+        description: Build directory that contains Windows output artifacts
+        required: false
+        default: build/windows-msvc-ninja-debug
+        type: string
+      run_tests:
+        description: Run ctest for matrix entries that do not opt out
+        required: false
+        default: true
+        type: boolean
+      include_clang_tidy_linux:
+        description: Install and verify clang-tidy on Linux builds
+        required: false
+        default: true
+        type: boolean
+      macos_mode:
+        description: macOS env setup mode (modern or legacy)
+        required: false
+        default: modern
+        type: string
+      artifact_prefix:
+        description: Optional artifact name prefix
+        required: false
+        default: ''
+        type: string
+      cache_key_prefix:
+        description: Optional cache key prefix
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow_failure || false }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
+
+    steps:
+      - name: Checkout (default ref)
+        if: inputs.checkout_ref == ''
+        uses: actions/checkout@v4
+
+      - name: Checkout (requested ref)
+        if: inputs.checkout_ref != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+
+      - name: Resolve vcpkg toolchain Unix
+        if: runner.os != 'Windows'
+        id: vcpkg-unix
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=()
+          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          fi
+          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
+          for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "Unable to locate vcpkg toolchain file on runner." >&2
+          exit 1
+
+      - name: Resolve vcpkg toolchain Windows
+        if: runner.os == 'Windows'
+        id: vcpkg-windows
+        shell: pwsh
+        run: |
+          $candidates = @()
+          if ($env:VCPKG_INSTALLATION_ROOT) {
+            $candidates += (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake')
+          }
+          $candidates += 'C:\vcpkg\scripts\buildsystems\vcpkg.cmake'
+
+          foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+              "toolchain=$candidate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+              exit 0
+            }
+          }
+
+          throw 'Unable to locate vcpkg toolchain file on runner.'
+
+      - name: Cache vcpkg and CMake deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/vcpkg_installed
+            build/_deps
+          key: >-
+            ${{ inputs.cache_key_prefix }}${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json') }}
+
+      - name: Setup Linux cross dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          configure_apt_sources() {
+            if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+              # Ubuntu 24.04+ runners use deb822 sources. Keep native repos on amd64/i386
+              # and add a dedicated ports source for foreign ARM architectures.
+              tmp_file="$(mktemp)"
+              awk '
+              /^Architectures:/ { print "Architectures: amd64 i386"; next }
+              { print }
+              ' /etc/apt/sources.list.d/ubuntu.sources > "$tmp_file"
+              sudo mv "$tmp_file" /etc/apt/sources.list.d/ubuntu.sources
+
+              . /etc/os-release
+              printf '%s\n' \
+                'Types: deb' \
+                'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
+                "Suites: ${VERSION_CODENAME} ${VERSION_CODENAME}-updates ${VERSION_CODENAME}-backports ${VERSION_CODENAME}-security" \
+                'Components: main universe restricted multiverse' \
+                'Architectures: armhf arm64' \
+                'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+                | sudo tee /etc/apt/sources.list.d/ubuntu-ports.sources > /dev/null
+            elif [ -f /etc/apt/sources.list ]; then
+              sudo sed -i '/arch=/! s/^deb/deb [arch=amd64,i386]/' /etc/apt/sources.list
+              awk '
+              $3 !~ /ubuntu\.com/ { next }
+              $1 == "deb" {
+                $2 = "[arch=armhf,arm64]";
+                $3 = "http://ports.ubuntu.com/ubuntu-ports/"
+              } 1' /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list > /dev/null
+            fi
+          }
+
+          configure_apt_sources
+
+          install_deps() {
+            local target_arch="$1"; shift
+            local native=("$@" php-cli qemu-user-binfmt)
+            local target=(
+              libboost-dev libcurl4-openssl-dev libsqlite3-dev libssl-dev
+              libxml2-dev zlib1g-dev
+            )
+
+            if [ "${{ inputs.include_clang_tidy_linux }}" = 'true' ]; then
+              native+=(clang-tidy)
+            fi
+
+            sudo dpkg --add-architecture "$target_arch"
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq aptitude > /dev/null
+            sudo aptitude install -yR "${native[@]}" "${target[@]/%/:$target_arch}" > /dev/null
+            sudo aptitude install -yR "${native[@]}" > /dev/null
+          }
+
+          case "$ARCH" in
+            x86_64)
+              install_deps amd64
+              ;;
+            i686)
+              install_deps i386 g++-multilib
+              {
+                echo "TOOLCHAIN=${GITHUB_WORKSPACE}/cmake/linux-cross.cmake"
+                echo "TOOLCHAIN_PREFIX=i386-linux-gnu"
+              } >> "$GITHUB_ENV"
+              ;;
+            armv7l)
+              install_deps armhf g++-arm-linux-gnueabihf
+              {
+                echo "TOOLCHAIN=${GITHUB_WORKSPACE}/cmake/linux-cross.cmake"
+                echo "TOOLCHAIN_PREFIX=arm-linux-gnueabihf"
+              } >> "$GITHUB_ENV"
+              ;;
+            aarch64)
+              install_deps arm64 g++-aarch64-linux-gnu
+              {
+                echo "TOOLCHAIN=${GITHUB_WORKSPACE}/cmake/linux-cross.cmake"
+                echo "TOOLCHAIN_PREFIX=aarch64-linux-gnu"
+              } >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported ARCH: $ARCH" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Setup macOS build environment (modern)
+        if: matrix.platform == 'macos' && inputs.macos_mode == 'modern'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          "$(brew --prefix llvm)/bin/clang-tidy" --version
+
+          echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
+
+          if [ -d /Library/Frameworks/Mono.framework ]; then
+            sudo rm -rf /Library/Frameworks/Mono.framework
+          fi
+
+      - name: Setup macOS build environment (legacy)
+        if: matrix.platform == 'macos' && inputs.macos_mode == 'legacy'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$ARCH" = 'arm64' ]; then
+            echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_TARGET=10.9" >> "$GITHUB_ENV"
+            echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk" >> "$GITHUB_ENV"
+            if [ ! -d /Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk ]; then
+              curl -fsSLO https://github.com/phracker/MacOSX-SDKs/releases/download/10.15/MacOSX10.10.sdk.tar.xz
+              echo "608a89db8b4be150a945871230b5ba5d4767a8500bc5fe76ddf10f5cec5ef513 MacOSX10.10.sdk.tar.xz" | shasum -a 256 -c
+              sudo tar xf MacOSX10.10.sdk.tar.xz -C /Library/Developer/CommandLineTools/SDKs
+            fi
+          fi
+
+          if [ -d /Library/Frameworks/Mono.framework ]; then
+            sudo rm -rf /Library/Frameworks/Mono.framework
+          fi
+
+      - name: Verify clang-tidy Linux
+        if: matrix.platform == 'linux' && inputs.include_clang_tidy_linux
+        shell: bash
+        run: clang-tidy --version
+
+      - name: Setup MSVC developer command prompt
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      - name: Verify clang-tidy Windows
+        if: matrix.platform == 'windows' && inputs.include_clang_tidy_linux
+        shell: pwsh
+        run: clang-tidy --version
+
+      - name: Setup ARM64EC flags
+        if: matrix.platform == 'windows' && matrix.arch == 'arm64ec'
+        shell: pwsh
+        run: |
+          'CFLAGS=-arm64EC' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          'CXXFLAGS=-arm64EC' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Configure Unix
+        if: runner.os != 'Windows'
+        env:
+          VCPKG_TOOLCHAIN: ${{ steps.vcpkg-unix.outputs.toolchain }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake_args=(
+            -B build
+            -DCMAKE_BUILD_TYPE=${{ inputs.build_type }}
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN"
+            -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
+            -DCMAKE_OSX_ARCHITECTURES="$ARCH"
+          )
+
+          if [ -n "${DEPLOY_TARGET:-}" ]; then
+            cmake_args+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=${DEPLOY_TARGET}")
+          fi
+
+          if [ -n "${TOOLCHAIN:-}" ]; then
+            cmake_args+=("-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${TOOLCHAIN}")
+          fi
+
+          cmake "${cmake_args[@]}"
+
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        env:
+          VCPKG_TOOLCHAIN: ${{ steps.vcpkg-windows.outputs.toolchain }}
+        shell: pwsh
+        run: |
+          cmake --preset ${{ inputs.windows_preset }} `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN" `
+            -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
+
+      - name: Build Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cmake --build build
+
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build --preset ${{ inputs.windows_preset }}
+
+      - name: Test Unix
+        if: runner.os != 'Windows' && inputs.run_tests && !matrix.skip_tests
+        shell: bash
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Test Windows
+        if: runner.os == 'Windows' && inputs.run_tests && !matrix.skip_tests
+        shell: pwsh
+        run: ctest --test-dir ${{ inputs.windows_artifact_dir }} --output-on-failure
+
+      - name: Upload Linux artifacts
+        if: always() && matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
+          path: build/reaper_*.so
+
+      - name: Upload macOS artifacts
+        if: always() && matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
+          path: build/reaper_*.dylib
+
+      - name: Upload Windows artifacts
+        if: always() && matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
+          path: |
+            ${{ inputs.windows_artifact_dir }}/reaper_*.dll
+            ${{ inputs.windows_artifact_dir }}/reaper_*.pdb
