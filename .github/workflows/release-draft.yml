@@ -265,13 +265,17 @@ jobs:
           VCPKG_TOOLCHAIN: ${{ steps.vcpkg-windows.outputs.toolchain }}
         shell: pwsh
         run: |
-          cmake -B build -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
+          cmake --preset windows-msvc-ninja-release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
 
-      - name: Build
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         run: cmake --build build
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build --preset windows-msvc-ninja-release
 
       - name: Upload Linux artifacts
         if: always() && matrix.platform == 'linux'
@@ -293,8 +297,8 @@ jobs:
         with:
           name: release-${{ matrix.name }}
           path: |
-            build/reaper_*.dll
-            build/reaper_*.pdb
+            build/windows-msvc-ninja-release/reaper_*.dll
+            build/windows-msvc-ninja-release/reaper_*.pdb
 
   create-draft-release:
     name: Create draft release

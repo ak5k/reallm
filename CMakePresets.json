@@ -9,7 +9,7 @@
         {
             "name": "base",
             "hidden": true,
-            "binaryDir": "${sourceDir}/build/${presetName}",
+            "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
@@ -18,15 +18,41 @@
             "name": "windows-msvc",
             "displayName": "Windows MSVC x64",
             "inherits": "base",
-            "generator": "Visual Studio 18 2026",
-            "architecture": {
-                "value": "x64",
-                "strategy": "set"
-            },
+            "binaryDir": "${sourceDir}/build/windows-msvc-vs",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-msvc-ninja",
+            "displayName": "Windows MSVC Ninja x64",
+            "inherits": "base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/windows-msvc-ninja",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-msvc-ninja-debug",
+            "displayName": "Windows MSVC Ninja x64 Debug",
+            "inherits": "windows-msvc-ninja",
+            "binaryDir": "${sourceDir}/build/windows-msvc-ninja-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-msvc-ninja-release",
+            "displayName": "Windows MSVC Ninja x64 Release",
+            "inherits": "windows-msvc-ninja",
+            "binaryDir": "${sourceDir}/build/windows-msvc-ninja-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
@@ -48,6 +74,7 @@
             "name": "linux-clang-debug",
             "displayName": "Linux LLVM Clang Debug",
             "inherits": "linux-clang",
+            "binaryDir": "${sourceDir}/build/linux-clang-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
@@ -56,6 +83,7 @@
             "name": "linux-clang-release",
             "displayName": "Linux LLVM Clang Release",
             "inherits": "linux-clang",
+            "binaryDir": "${sourceDir}/build/linux-clang-release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -79,6 +107,7 @@
             "name": "macos-clang-debug",
             "displayName": "macOS Clang Debug",
             "inherits": "macos-clang",
+            "binaryDir": "${sourceDir}/build/macos-clang-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
@@ -87,37 +116,7 @@
             "name": "macos-clang-release",
             "displayName": "macOS Clang Release",
             "inherits": "macos-clang",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "windows-msvc-ninja",
-            "displayName": "Windows MSVC Ninja x64",
-            "inherits": "base",
-            "generator": "Ninja",
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
-                "CMAKE_CXX_COMPILER": "cl"
-            }
-        },
-        {
-            "name": "windows-msvc-ninja-debug",
-            "displayName": "Windows MSVC Ninja x64 Debug",
-            "inherits": "windows-msvc-ninja",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "windows-msvc-ninja-release",
-            "displayName": "Windows MSVC Ninja x64 Release",
-            "inherits": "windows-msvc-ninja",
+            "binaryDir": "${sourceDir}/build/macos-clang-release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
