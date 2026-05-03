@@ -12,31 +12,30 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: linux-x86_64
-            os: ubuntu-22.04
+            os: ubuntu-latest
             platform: linux
             arch: x86_64
             triplet: arch-env
             skip_tests: false
           - name: linux-i686
-            os: ubuntu-22.04
+            os: ubuntu-latest
             platform: linux
             arch: i686
             triplet: arch-env
             skip_tests: false
           - name: linux-armv7l
-            os: ubuntu-22.04
+            os: ubuntu-latest
             platform: linux
             arch: armv7l
             triplet: arch-env
             skip_tests: false
           - name: linux-aarch64
-            os: ubuntu-22.04
+            os: ubuntu-latest
             platform: linux
             arch: aarch64
             triplet: arch-env
@@ -62,25 +61,12 @@ jobs:
             msvc_arch: amd64_arm64
             triplet: arm64ec-windows-static
             skip_tests: true
-          - name: macos-x86_64
-            os: macos-13
+          - name: macos-universal
+            os: macos-latest
             platform: macos
-            arch: x86_64
+            arch: x86_64;arm64
             triplet: arch-env
             skip_tests: false
-          - name: macos-i386
-            os: macos-13
-            platform: macos
-            arch: i386
-            triplet: arch-env
-            skip_tests: false
-            allow_failure: true
-          - name: macos-arm64
-            os: macos-14
-            platform: macos
-            arch: arm64
-            triplet: arch-env
-            skip_tests: true
     env:
       ARCH: ${{ matrix.arch }}
       VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
@@ -210,17 +196,7 @@ jobs:
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           "$(brew --prefix llvm)/bin/clang-tidy" --version
 
-          if [ "$ARCH" = "arm64" ]; then
-            echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
-          else
-            echo "DEPLOY_TARGET=10.9" >> "$GITHUB_ENV"
-            echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk" >> "$GITHUB_ENV"
-            if [ ! -d /Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk ]; then
-              curl -fsSLO https://github.com/phracker/MacOSX-SDKs/releases/download/10.15/MacOSX10.10.sdk.tar.xz
-              echo "608a89db8b4be150a945871230b5ba5d4767a8500bc5fe76ddf10f5cec5ef513 MacOSX10.10.sdk.tar.xz" | shasum -a 256 -c
-              sudo tar xf MacOSX10.10.sdk.tar.xz -C /Library/Developer/CommandLineTools/SDKs
-            fi
-          fi
+          echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
 
           if [ -d /Library/Frameworks/Mono.framework ]; then
             sudo rm -rf /Library/Frameworks/Mono.framework
