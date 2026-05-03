@@ -28,15 +28,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clang-format (Linuxbrew)
+      - name: Install clang-format and gersemi (Linuxbrew)
         shell: bash
         run: |
           set -euo pipefail
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew update
-          brew install llvm
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          brew install clang-format gersemi
+          echo "$(brew --prefix clang-format)/bin" >> "$GITHUB_PATH"
           clang-format --version
+          gersemi --version
 
       - name: Check formatting
         shell: bash
@@ -51,6 +52,21 @@ jobs:
           fi
 
           clang-format --dry-run --Werror "${files[@]}"
+
+      - name: Check CMake formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          mapfile -t cmake_files < <(git ls-files \
+            'CMakeLists.txt' '*.cmake')
+
+          if [ "${#cmake_files[@]}" -eq 0 ]; then
+            echo "No CMake files found."
+            exit 0
+          fi
+
+          gersemi --check "${cmake_files[@]}"
 
   tooling-linux:
     name: Tooling Linux configure-build-test + clang-tidy
