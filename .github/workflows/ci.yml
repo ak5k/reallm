@@ -234,7 +234,7 @@ jobs:
           set -euo pipefail
           cmake_args=(
             -B build
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Debug
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN"
             -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
             -DCMAKE_OSX_ARCHITECTURES="$ARCH"
@@ -256,7 +256,7 @@ jobs:
           VCPKG_TOOLCHAIN: ${{ steps.vcpkg-windows.outputs.toolchain }}
         shell: pwsh
         run: |
-          cmake --preset windows-msvc-ninja-release `
+          cmake --preset windows-msvc-ninja-debug `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN" `
             -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
 
@@ -268,7 +268,7 @@ jobs:
       - name: Build Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: cmake --build --preset windows-msvc-ninja-release
+        run: cmake --build --preset windows-msvc-ninja-debug
 
       - name: Test Unix
         if: runner.os != 'Windows' && !matrix.skip_tests
@@ -278,7 +278,7 @@ jobs:
       - name: Test Windows
         if: runner.os == 'Windows' && !matrix.skip_tests
         shell: pwsh
-        run: ctest --test-dir build/windows-msvc-ninja-release --output-on-failure
+        run: ctest --test-dir build/windows-msvc-ninja-debug --output-on-failure
 
       - name: Upload Linux artifacts
         if: always() && matrix.platform == 'linux'
@@ -300,8 +300,8 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: |
-            build/windows-msvc-ninja-release/reaper_*.dll
-            build/windows-msvc-ninja-release/reaper_*.pdb
+            build/windows-msvc-ninja-debug/reaper_*.dll
+            build/windows-msvc-ninja-debug/reaper_*.pdb
 
   clang-format-report:
     name: clang-format report
@@ -310,11 +310,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Install clang-format (Linuxbrew)
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          clang-format --version
 
-      - name: Check formatting non-blocking
-        continue-on-error: true
+      - name: Check formatting
         shell: bash
         run: |
           set -euo pipefail

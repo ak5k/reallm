@@ -2,10 +2,13 @@
 #include <unordered_set>
 
 template <typename Node>
+// NOLINTNEXTLINE(bugprone-exception-escape)
 class Network
 {
 public:
-    Network() noexcept = default;
+    Network()
+    {
+    }
 
     void addNode(Node node)
     {

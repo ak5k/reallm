@@ -17,6 +17,7 @@
         {
             "name": "windows-msvc",
             "displayName": "Windows MSVC x64",
+            "hidden": true,
             "inherits": "base",
             "binaryDir": "${sourceDir}/build/windows-msvc-vs",
             "condition": {
@@ -26,8 +27,21 @@
             }
         },
         {
+            "name": "windows-msvc-debug",
+            "displayName": "Windows MSVC x64 Debug",
+            "inherits": "windows-msvc",
+            "binaryDir": "${sourceDir}/build/windows-msvc-debug"
+        },
+        {
+            "name": "windows-msvc-release",
+            "displayName": "Windows MSVC x64 Release",
+            "inherits": "windows-msvc",
+            "binaryDir": "${sourceDir}/build/windows-msvc-release"
+        },
+        {
             "name": "windows-msvc-ninja",
             "displayName": "Windows MSVC Ninja x64",
+            "hidden": true,
             "inherits": "base",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/windows-msvc-ninja",
@@ -125,12 +139,12 @@
     "buildPresets": [
         {
             "name": "windows-msvc-debug",
-            "configurePreset": "windows-msvc",
+            "configurePreset": "windows-msvc-debug",
             "configuration": "Debug"
         },
         {
             "name": "windows-msvc-release",
-            "configurePreset": "windows-msvc",
+            "configurePreset": "windows-msvc-release",
             "configuration": "Release"
         },
         {
@@ -161,7 +175,7 @@
     "testPresets": [
         {
             "name": "windows-msvc-debug",
-            "configurePreset": "windows-msvc",
+            "configurePreset": "windows-msvc-debug",
             "configuration": "Debug"
         },
         {

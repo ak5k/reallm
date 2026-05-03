@@ -108,21 +108,36 @@ if(_test_sources)
     gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()
 
-list(LENGTH CMAKE_OSX_ARCHITECTURES _osx_arch_count)
-if(NOT _osx_arch_count GREATER 1)
-    set_target_properties(
-        ${PROJECT_NAME}_lib
-        ${PROJECT_NAME}
-        PROPERTIES CXX_CLANG_TIDY "clang-tidy"
-    )
-    if(TARGET ${PROJECT_NAME}_tests)
+function(configure_target_clang_tidy target_name tidy_command)
+    if(TARGET ${target_name})
         set_target_properties(
-            ${PROJECT_NAME}_tests
-            PROPERTIES CXX_CLANG_TIDY "clang-tidy"
+            ${target_name}
+            PROPERTIES CXX_CLANG_TIDY "${tidy_command}"
         )
     endif()
+endfunction()
+
+set(_clang_tidy_enabled TRUE)
+if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES ";")
+    set(_clang_tidy_enabled FALSE)
 endif()
-unset(_osx_arch_count)
+
+if(_clang_tidy_enabled)
+    set(_clang_tidy_command "clang-tidy")
+    if(WIN32)
+        # MSVC release flags (for example /GL) are not understood by clang-tidy's
+        # compile simulation and can be reported as unused command-line arguments.
+        string(
+            APPEND _clang_tidy_command
+            ";--extra-arg=-Wno-unused-command-line-argument"
+        )
+    endif()
+
+    configure_target_clang_tidy(${PROJECT_NAME}_lib "${_clang_tidy_command}")
+    configure_target_clang_tidy(${PROJECT_NAME} "${_clang_tidy_command}")
+    configure_target_clang_tidy(${PROJECT_NAME}_tests "${_clang_tidy_command}")
+endif()
+unset(_clang_tidy_enabled)
 
 target_compile_definitions(
     ${PROJECT_NAME}_lib
@@ -132,7 +147,7 @@ target_compile_definitions(
         REALLM_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
-if(WIN32)
+if(MSVC)
     foreach(
         arg
         CMAKE_C_FLAGS_DEBUG
@@ -165,7 +180,6 @@ if(WIN32)
         ${PROJECT_NAME}_lib
         PRIVATE /W3 /WX /wd4996 /wd4244 /wd4267 /wd4305
     )
-    target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
 
     if(NOT CMAKE_PROJECT_VERSION_TWEAK EQUAL "1")
         add_link_options(
@@ -190,6 +204,10 @@ else()
             -Wno-conversion
             -Wno-sign-conversion
     )
+endif()
+
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
 endif()
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
