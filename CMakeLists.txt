@@ -35,10 +35,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(cmake/reaper-plugin.cmake)
-reaper_plugin_fetch_dependencies()
-
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest
@@ -48,15 +44,16 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 
-find_package(WDL REQUIRED)
-reaper_plugin_setup_sdk()
-
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 
 add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(cmake/reaper-plugin.cmake)
+
 enable_testing()
 include(GoogleTest)
 
@@ -68,10 +65,6 @@ target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/main.cpp")
 
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
-
-reaper_plugin_configure_install_prefix()
-reaper_plugin_configure_target(${PROJECT_NAME})
-reaper_plugin_install_target(${PROJECT_NAME})
 
 file(
     GLOB_RECURSE _test_sources
