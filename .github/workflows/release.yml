@@ -204,6 +204,7 @@ jobs:
       artifact_prefix: release
       cache_key_prefix: release-
       package_with_cpack: true
+      sign_windows_artifacts: true
       notarize_macos: true
     secrets: inherit
 
