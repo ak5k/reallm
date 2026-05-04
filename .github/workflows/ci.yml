@@ -1,0 +1,337 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-matrix.yml
+    with:
+      build_type: Debug
+      windows_preset: windows-msvc-ninja-debug
+      windows_artifact_dir: build/windows-msvc-ninja-debug
+      run_tests: true
+      include_clang_tidy_linux: true
+
+  clang-format-report:
+    name: clang-format report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format and gersemi (Linuxbrew)
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew install clang-format gersemi
+          echo "$(brew --prefix clang-format)/bin" >> "$GITHUB_PATH"
+          clang-format --version
+          gersemi --version
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git ls-files \
+            '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hpp' '*.hxx' '*.inl')
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No format-managed files found."
+            exit 0
+          fi
+
+          clang-format --dry-run --Werror "${files[@]}"
+
+      - name: Check CMake formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          mapfile -t cmake_files < <(git ls-files \
+            'CMakeLists.txt' '*.cmake')
+
+          if [ "${#cmake_files[@]}" -eq 0 ]; then
+            echo "No CMake files found."
+            exit 0
+          fi
+
+          gersemi --check "${cmake_files[@]}"
+
+  tooling-linux:
+    name: Tooling Linux configure-build-test + clang-tidy
+    runs-on: ubuntu-latest
+    env:
+      ARCH: x86_64
+      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tooling dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang clang-tidy
+
+      - name: Resolve vcpkg toolchain
+        id: vcpkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=()
+          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          fi
+          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
+          for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "Unable to locate vcpkg toolchain file on runner." >&2
+          exit 1
+
+      - name: Cache vcpkg and CMake deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/tooling/vcpkg_installed
+            build/tooling/_deps
+          key: >-
+            tooling-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json', '.clang-tidy', '.clang-format') }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build/tooling -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
+            -DVCPKG_TARGET_TRIPLET=arch-env
+
+      - name: Build
+        run: cmake --build build/tooling
+
+      - name: Test
+        run: ctest --test-dir build/tooling --output-on-failure
+
+  sanitizer-asan-ubsan-lsan:
+    name: Sanitizer ASAN+UBSAN+LSAN
+    runs-on: ubuntu-latest
+    env:
+      ARCH: x86_64
+      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Linuxbrew LLVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          clang --version
+
+      - name: Resolve vcpkg toolchain
+        id: vcpkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=()
+          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          fi
+          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
+          for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "Unable to locate vcpkg toolchain file on runner." >&2
+          exit 1
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build/asan -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
+            -DVCPKG_TARGET_TRIPLET=arch-env \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined,leak -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined,leak -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined,leak" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined,leak"
+
+      - name: Build
+        run: cmake --build build/asan
+
+      - name: Test
+        run: ctest --test-dir build/asan --output-on-failure
+
+  sanitizer-tsan:
+    name: Sanitizer TSAN
+    runs-on: ubuntu-latest
+    env:
+      ARCH: x86_64
+      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Linuxbrew LLVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          clang --version
+
+      - name: Resolve vcpkg toolchain
+        id: vcpkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=()
+          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          fi
+          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
+          for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "Unable to locate vcpkg toolchain file on runner." >&2
+          exit 1
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build/tsan -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
+            -DVCPKG_TARGET_TRIPLET=arch-env \
+            -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Build
+        run: cmake --build build/tsan
+
+      - name: Test
+        run: ctest --test-dir build/tsan --output-on-failure
+
+  sanitizer-rtsan:
+    name: Sanitizer RTSAN
+    runs-on: ubuntu-latest
+    env:
+      ARCH: x86_64
+      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Linuxbrew LLVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew install llvm
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          clang --version
+
+      - name: Resolve vcpkg toolchain
+        id: vcpkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=()
+          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
+          fi
+          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
+          for candidate in "${candidates[@]}"; do
+            if [ -f "$candidate" ]; then
+              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "Unable to locate vcpkg toolchain file on runner." >&2
+          exit 1
+
+      - name: Probe realtime sanitizer support
+        id: rtsan-probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/rtsan_probe.cpp << 'EOF'
+          int main() { return 0; }
+          EOF
+
+          if clang++ -fsanitize=realtime /tmp/rtsan_probe.cpp -o /tmp/rtsan_probe >/dev/null 2>&1; then
+            echo "supported=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "supported=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure
+        if: steps.rtsan-probe.outputs.supported == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build/rtsan -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
+            -DVCPKG_TARGET_TRIPLET=arch-env \
+            -DCMAKE_C_FLAGS="-fsanitize=realtime -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=realtime -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=realtime" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=realtime"
+
+      - name: Build
+        if: steps.rtsan-probe.outputs.supported == 'true'
+        run: cmake --build build/rtsan
+
+      - name: Test
+        if: steps.rtsan-probe.outputs.supported == 'true'
+        run: ctest --test-dir build/rtsan --output-on-failure
+
+      - name: RTSAN unavailable note
+        if: steps.rtsan-probe.outputs.supported != 'true'
+        run: |
+          echo "RTSAN is not supported by this LLVM toolchain; skipping job payload."
