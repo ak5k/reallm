@@ -129,7 +129,7 @@ jobs:
 
       - name: Setup Homebrew Unix
         if: runner.os != 'Windows'
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install Unix Homebrew packages
         if: runner.os != 'Windows'
