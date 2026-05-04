@@ -31,13 +31,16 @@ jobs:
         with:
           node-version: "lts/*"
 
-      - name: Install dependencies
-        run: npm clean-install
-
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: >-
+          npx
+          --package semantic-release@24
+          --package @semantic-release/commit-analyzer@13
+          --package @semantic-release/release-notes-generator@14
+          --package @semantic-release/github@11
+          semantic-release
 
       - name: Capture release tag
         id: tag
