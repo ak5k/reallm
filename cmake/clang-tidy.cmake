@@ -82,13 +82,14 @@ function(enable_clang_tidy_for_targets)
     endforeach()
 endfunction()
 
-if(PROJECT_NAME)
-    cmake_language(
-        DEFER
-        CALL
-        enable_clang_tidy_for_targets
-        "${PROJECT_NAME}_lib"
-        "${PROJECT_NAME}"
-        "${PROJECT_NAME}_tests"
-    )
-endif()
+    if(PROJECT_NAME)
+        cmake_language(
+            DEFER
+            CALL
+            enable_clang_tidy_for_targets
+            "${PROJECT_NAME}_lib"
+            "${PROJECT_NAME}"
+            "${PROJECT_NAME}_tests"
+        )
+    endif()
+
