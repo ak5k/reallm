@@ -25,6 +25,27 @@ endforeach()
 
 project(reallm VERSION ${_version} LANGUAGES C CXX)
 
+set(PROJECT_VERSION_BUILD 0)
+if(DEFINED ENV{GITHUB_RUN_NUMBER} AND NOT "$ENV{GITHUB_RUN_NUMBER}" STREQUAL "")
+    set(PROJECT_VERSION_BUILD "$ENV{GITHUB_RUN_NUMBER}")
+endif()
+
+set(PROJECT_VERSION_COMMIT "unknown")
+if(DEFINED ENV{GITHUB_SHA} AND NOT "$ENV{GITHUB_SHA}" STREQUAL "")
+    set(PROJECT_VERSION_COMMIT "$ENV{GITHUB_SHA}")
+else()
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE _git_head_commit
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(NOT "${_git_head_commit}" STREQUAL "")
+        set(PROJECT_VERSION_COMMIT "${_git_head_commit}")
+    endif()
+endif()
+
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

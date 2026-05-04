@@ -2,6 +2,7 @@
 #include "network.h"
 #include "reaper_vararg.h"
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -1193,12 +1194,23 @@ const char* defstring_GetVersion =
 void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut,
                 int commitOut_sz)
 {
-    (void)commitOut_sz; // unused parameter
-    *majorOut = REALLM_VERSION_MAJOR;
-    *minorOut = REALLM_VERSION_MINOR;
-    *patchOut = REALLM_VERSION_PATCH;
-    *buildOut = 0;
-    commitOut[0] = '\0';
+    if (majorOut)
+        *majorOut = REALLM_VERSION_MAJOR;
+    if (minorOut)
+        *minorOut = REALLM_VERSION_MINOR;
+    if (patchOut)
+        *patchOut = REALLM_VERSION_PATCH;
+    if (buildOut)
+        *buildOut = REALLM_VERSION_BUILD;
+
+    if (!commitOut || commitOut_sz <= 0)
+        return;
+
+    const char* commit = REALLM_VERSION_COMMIT;
+    auto commit_len = (int)strlen(commit);
+    auto copy_len = min(commitOut_sz - 1, commit_len);
+    std::copy(commit, commit + copy_len, commitOut);
+    commitOut[copy_len] = '\0';
 }
 
 void Register()
