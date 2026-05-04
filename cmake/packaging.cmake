@@ -84,9 +84,15 @@ else()
     set(CPACK_SYSTEM_NAME "linux-${_pkg_arch}")
 endif()
 
-set(CPACK_PACKAGE_FILE_NAME
-    "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}"
-)
+if(APPLE)
+    set(CPACK_PACKAGE_FILE_NAME
+        "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}"
+    )
+else()
+    set(CPACK_PACKAGE_FILE_NAME
+        "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}"
+    )
+endif()
 
 set(CPACK_PACKAGE_DIRECTORY
     "${CMAKE_BINARY_DIR}/packages"
@@ -103,6 +109,10 @@ endforeach()
 
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_STRIP_FILES OFF)
+
+# Ensure generators that rely on component metadata (notably macOS
+# productbuild) include the default install component.
+set(CPACK_COMPONENTS_ALL "Unspecified")
 
 # Generator selection.
 if(WIN32)
@@ -172,7 +182,9 @@ endif()
 # end of its script. Save the binary name before inclusion.
 set(_binary_pkg_file_name "${CPACK_PACKAGE_FILE_NAME}")
 
-include(CPack)
+# Use CMake's built-in CPack module explicitly to avoid accidentally loading
+# a local cpack.cmake on case-insensitive filesystems.
+include(${CMAKE_ROOT}/Modules/CPack.cmake)
 
 # ── Notarize (macOS) ──────────────────────────────────────────────────────────
 if(
