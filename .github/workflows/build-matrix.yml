@@ -149,24 +149,40 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           winget install --id Kitware.CMake --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
-          winget install --id NSIS.NSIS --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
 
-          $candidatePaths = @(
-            'C:\Program Files\CMake\bin',
-            'C:\Program Files\NSIS\Bin',
-            'C:\Program Files (x86)\NSIS\Bin',
-            "$env:LOCALAPPDATA\Programs\NSIS\Bin"
+          $cmakePaths = @(
+            'C:\Program Files\CMake\bin'
           )
 
-          foreach ($pathEntry in $candidatePaths) {
+          foreach ($pathEntry in $cmakePaths) {
             $pathEntry | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
             if (-not (($env:Path -split ';') -contains $pathEntry)) {
               $env:Path = "$pathEntry;$env:Path"
             }
           }
 
+          if ('${{ inputs.package_with_cpack }}' -eq 'true') {
+            winget install --id NSIS.NSIS --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
+
+            $nsisPaths = @(
+              'C:\Program Files\NSIS\Bin',
+              'C:\Program Files (x86)\NSIS\Bin',
+              "$env:LOCALAPPDATA\Programs\NSIS\Bin"
+            )
+
+            foreach ($pathEntry in $nsisPaths) {
+              $pathEntry | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              if (-not (($env:Path -split ';') -contains $pathEntry)) {
+                $env:Path = "$pathEntry;$env:Path"
+              }
+            }
+          }
+
           cmake --version
-          makensis /VERSION
+
+          if ('${{ inputs.package_with_cpack }}' -eq 'true') {
+            makensis /VERSION
+          }
 
       - name: Cache CMake deps
         uses: actions/cache@v4
