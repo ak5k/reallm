@@ -9,8 +9,6 @@ function(_resolve_clang_tidy out_var)
     if(CLANG_TIDY_PATH)
         set(_clang_tidy_executable "${CLANG_TIDY_PATH}")
     else()
-        set(_clang_tidy_hints "")
-
         find_program(_brew_executable NAMES brew)
         if(_brew_executable)
             execute_process(
@@ -20,20 +18,25 @@ function(_resolve_clang_tidy out_var)
                 ERROR_QUIET
                 RESULT_VARIABLE _brew_result
             )
-            if(_brew_result EQUAL 0 AND _brew_llvm_prefix)
-                list(APPEND _clang_tidy_hints "${_brew_llvm_prefix}/bin")
+            if(
+                _brew_result EQUAL 0
+                AND EXISTS "${_brew_llvm_prefix}/bin/clang-tidy"
+            )
+                set(_clang_tidy_executable
+                    "${_brew_llvm_prefix}/bin/clang-tidy"
+                )
             endif()
         endif()
 
-        list(APPEND _clang_tidy_hints /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin)
-
-        find_program(_clang_tidy_executable NAMES clang-tidy)
+        if(NOT _clang_tidy_executable)
+            find_program(_clang_tidy_executable NAMES clang-tidy)
+        endif()
 
         if(NOT _clang_tidy_executable)
             find_program(
                 _clang_tidy_executable
                 NAMES clang-tidy
-                HINTS ${_clang_tidy_hints}
+                HINTS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin
             )
         endif()
     endif()
@@ -82,14 +85,12 @@ function(enable_clang_tidy_for_targets)
     endforeach()
 endfunction()
 
-    if(PROJECT_NAME)
-        cmake_language(
-            DEFER
-            CALL
-            enable_clang_tidy_for_targets
-            "${PROJECT_NAME}_lib"
-            "${PROJECT_NAME}"
-            "${PROJECT_NAME}_tests"
-        )
-    endif()
-
+if(PROJECT_NAME)
+    cmake_language(
+        DEFER
+        CALL enable_clang_tidy_for_targets
+        "${PROJECT_NAME}_lib"
+        "${PROJECT_NAME}"
+        "${PROJECT_NAME}_tests"
+    )
+endif()
