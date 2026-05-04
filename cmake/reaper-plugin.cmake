@@ -4,9 +4,7 @@ include(FetchContent)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
-set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 FetchContent_Declare(
     WDL
@@ -97,6 +95,15 @@ set_target_properties(
         PREFIX
             "" # disable the "lib" prefix
         OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
+)
+set_target_properties(
+    ${PROJECT_NAME}_lib
+    PROPERTIES POSITION_INDEPENDENT_CODE ON
+)
+set_target_properties(
+    ${PROJECT_NAME}_lib
+    ${PROJECT_NAME}
+    PROPERTIES CXX_VISIBILITY_PRESET hidden
 )
 
 set(REAPER_USER_PLUGINS "UserPlugins")
