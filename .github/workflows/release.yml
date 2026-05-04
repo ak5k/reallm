@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      bump_rc:
+        description: "Create a new RC instead of updating the existing one"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -15,17 +20,44 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       released: ${{ steps.tag.outputs.released }}
+      is_update: ${{ steps.tag.outputs.is_update }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
+      - name: Check for existing RC release
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const rcPattern = /^v\d+\.\d+\.\d+-rc\.\d+$/i;
+            const candidate = releases
+              .filter(r => rcPattern.test(r.tag_name ?? ""))
+              .filter(r => r.draft || r.prerelease)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+            const existingTag = candidate?.tag_name ?? "";
+            const isUpdate = existingTag !== "" && context.payload.inputs?.bump_rc !== "true";
+            core.info(`existing_tag=${existingTag}, is_update=${isUpdate}`);
+            core.setOutput("existing_tag", existingTag);
+            core.setOutput("is_update", isUpdate ? "true" : "false");
+
       - uses: actions/setup-node@v4
+        if: steps.existing.outputs.is_update != 'true'
         with:
           node-version: "lts/*"
 
       - name: Release
+        if: steps.existing.outputs.is_update != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
@@ -40,13 +72,21 @@ jobs:
 
       - name: Capture release tag
         id: tag
+        env:
+          IS_UPDATE: ${{ steps.existing.outputs.is_update }}
+          EXISTING_TAG: ${{ steps.existing.outputs.existing_tag }}
         run: |
-          tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          if [[ "$IS_UPDATE" == "true" ]]; then
+            tag="$EXISTING_TAG"
+          else
+            tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "is_update=$IS_UPDATE" >> "$GITHUB_OUTPUT"
           echo "released=$([[ -n $tag ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Delete older RC draft/prereleases and tags
-        if: steps.tag.outputs.released == 'true'
+        if: inputs.bump_rc && steps.tag.outputs.released == 'true'
         uses: actions/github-script@v7
         env:
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
@@ -141,7 +181,21 @@ jobs:
           merge-multiple: true
           path: release-artifacts
 
-      - name: Upload artifacts to release
+      - name: Update existing RC release assets
+        if: needs.prepare-release.outputs.is_update == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            release-artifacts/reaper_*.dll \
+            release-artifacts/reaper_*.pdb \
+            release-artifacts/reaper_*.so \
+            release-artifacts/reaper_*.dylib \
+            --clobber --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+      - name: Upload artifacts to new release
+        if: needs.prepare-release.outputs.is_update != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag }}
