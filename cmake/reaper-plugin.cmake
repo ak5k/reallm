@@ -107,5 +107,6 @@ if(WIN32)
     install(
         FILES $<TARGET_PDB_FILE:${PROJECT_NAME}>
         DESTINATION "${REAPER_USER_PLUGINS}"
+        OPTIONAL
     )
 endif()

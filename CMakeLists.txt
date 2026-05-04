@@ -42,6 +42,7 @@ FetchContent_Declare(
     SYSTEM
 )
 
+set(INSTALL_GTEST OFF)
 FetchContent_MakeAvailable(googletest)
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
@@ -184,3 +185,5 @@ endif()
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
 endif()
+
+include(cmake/cpack.cmake)
