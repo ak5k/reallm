@@ -52,7 +52,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
 if(MSVC)
     target_compile_options(
         ${PROJECT_NAME}_lib
-        PRIVATE /W3 /WX /wd4996 /wd4244 /wd4267 /wd4305
+        PUBLIC /W3 /WX /wd4996 /wd4244 /wd4267 /wd4305
     )
 else()
     target_compile_options(
