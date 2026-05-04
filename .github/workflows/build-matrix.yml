@@ -142,18 +142,19 @@ jobs:
           echo "$(brew --prefix cmake)/bin" >> "$GITHUB_PATH"
           cmake --version
 
-      - name: Install latest CMake Windows
+      - name: Install CMake and NSIS Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           winget install --id Kitware.CMake --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
+          winget install --id NSIS.NSIS --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
 
-          $cmakeBin = 'C:\Program Files\CMake\bin'
-          if (Test-Path $cmakeBin) {
-            $cmakeBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          }
+          'C:\Program Files\CMake\bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          'C:\Program Files\NSIS' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          'C:\Program Files (x86)\NSIS' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
           cmake --version
+          makensis /VERSION
 
       - name: Cache CMake deps
         uses: actions/cache@v4
