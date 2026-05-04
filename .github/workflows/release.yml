@@ -183,16 +183,18 @@ jobs:
 
       - name: Update existing RC release assets
         if: needs.prepare-release.outputs.is_update == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
-        run: |
-          gh release upload "$RELEASE_TAG" \
-            release-artifacts/reaper_*.dll \
-            release-artifacts/reaper_*.pdb \
-            release-artifacts/reaper_*.so \
-            release-artifacts/reaper_*.dylib \
-            --clobber --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          draft: true
+          generate_release_notes: false
+          files: |
+            release-artifacts/reaper_*.dll
+            release-artifacts/reaper_*.pdb
+            release-artifacts/reaper_*.so
+            release-artifacts/reaper_*.dylib
+          fail_on_unmatched_files: false
+          overwrite_files: true
 
       - name: Upload artifacts to new release
         if: needs.prepare-release.outputs.is_update != 'true'

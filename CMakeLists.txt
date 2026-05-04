@@ -36,49 +36,13 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include(FetchContent)
 
 FetchContent_Declare(
-    WDL
-    GIT_REPOSITORY https://github.com/justinfrankel/WDL
-    GIT_TAG "origin/main"
-    SYSTEM
-)
-
-FetchContent_Declare(
-    reaper_sdk
-    GIT_REPOSITORY https://github.com/justinfrankel/reaper-sdk
-    GIT_TAG "origin/main"
-    SYSTEM
-)
-
-FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest
     GIT_TAG v1.17.0
     SYSTEM
 )
 
-FetchContent_MakeAvailable(WDL reaper_sdk googletest)
-
-# symlink WDL to reaper-sdk
-execute_process(
-    COMMAND
-        ${CMAKE_COMMAND} -E create_symlink "${wdl_SOURCE_DIR}/WDL"
-        "${reaper_sdk_SOURCE_DIR}/WDL"
-)
-
-set(WDL_ROOT_DIR "${wdl_SOURCE_DIR}")
-
-add_library(reaper-sdk IMPORTED INTERFACE)
-target_include_directories(
-    reaper-sdk
-    SYSTEM
-    INTERFACE "${reaper_sdk_SOURCE_DIR}/sdk"
-)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-find_package(WDL REQUIRED)
-
-target_link_libraries(reaper-sdk INTERFACE WDL::WDL)
+FetchContent_MakeAvailable(googletest)
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
@@ -86,6 +50,10 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 
 add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(cmake/reaper-plugin.cmake)
+
 enable_testing()
 include(GoogleTest)
 
@@ -216,107 +184,3 @@ endif()
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
 endif()
-
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    if(WIN32)
-        set(USER_CONFIG_DIR "$ENV{APPDATA}")
-    elseif(APPLE)
-        set(USER_CONFIG_DIR "~/Library/Application Support")
-    else()
-        set(USER_CONFIG_DIR "~/.config")
-    endif()
-
-    set(CMAKE_INSTALL_PREFIX
-        "${USER_CONFIG_DIR}/REAPER"
-        CACHE PATH
-        "REAPER resource path where to install ReaPack"
-        FORCE
-    )
-endif()
-
-if(CMAKE_OSX_ARCHITECTURES)
-    list(JOIN CMAKE_OSX_ARCHITECTURES "-" ARCH_NAME)
-elseif(MSVC_CXX_ARCHITECTURE_ID)
-    set(ARCH_NAME ${MSVC_CXX_ARCHITECTURE_ID})
-else()
-    set(ARCH_NAME ${CMAKE_SYSTEM_PROCESSOR})
-endif()
-
-string(TOLOWER "${ARCH_NAME}" ARCH_NAME)
-set_target_properties(
-    ${PROJECT_NAME}
-    PROPERTIES
-        PREFIX
-            "" # disable the "lib" prefix
-        OUTPUT_NAME "reaper_${PROJECT_NAME}-${ARCH_NAME}"
-)
-
-set(REAPER_USER_PLUGINS "UserPlugins")
-install(
-    TARGETS ${PROJECT_NAME}
-    COMPONENT ${PROJECT_NAME}
-    RUNTIME
-        DESTINATION
-            "${REAPER_USER_PLUGINS}" # Windows .dll
-    LIBRARY
-        DESTINATION
-            "${REAPER_USER_PLUGINS}" # Linux .so/macOS .dylib
-)
-
-# Set the component as required
-set(CPACK_COMPONENT_${PROJECT_NAME}_REQUIRED ON)
-if(WIN32)
-    install(
-        FILES $<TARGET_PDB_FILE:${PROJECT_NAME}>
-        COMPONENT ${PROJECT_NAME}
-        DESTINATION "${REAPER_USER_PLUGINS}"
-    )
-endif()
-
-if(APPLE)
-    set(CPACK_PACKAGING_INSTALL_PREFIX "/Library/Application Support/REAPER")
-    set(CPACK_COMPONENTS_ALL ${PROJECT_NAME})
-    set(CPACK_GENERATOR productbuild)
-elseif(WIN32)
-    set(CPACK_GENERATOR NSIS)
-else()
-    set(CPACK_GENERATOR TXZ)
-endif()
-
-if(CMAKE_SIZEOF_VOID_P EQUAL "8")
-    set(CPUBITS "64")
-else()
-    set(CPUBITS "32")
-endif()
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-macOS")
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-    execute_process(
-        COMMAND
-            ${CMAKE_COMMAND} -E create_symlink
-            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-            "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt"
-    )
-    set(CPACK_RESOURCE_FILE_README
-        "${CMAKE_CURRENT_BINARY_DIR}/link_readme.txt"
-    )
-endif()
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-    execute_process(
-        COMMAND
-            ${CMAKE_COMMAND} -E create_symlink
-            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-            "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt"
-    )
-    set(CPACK_RESOURCE_FILE_LICENSE
-        "${CMAKE_CURRENT_BINARY_DIR}/link_license.txt"
-    )
-endif()
-
-set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME}")
-set(CPACK_NSIS_CPUBITS ${CPUBITS})
-
-include(CPack)
