@@ -16,7 +16,6 @@ jobs:
       windows_preset: windows-msvc-ninja-debug
       windows_artifact_dir: build/windows-msvc-ninja-debug
       run_tests: true
-      include_clang_tidy_linux: true
 
   clang-format-report:
     name: clang-format report
@@ -25,11 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
       - name: Install clang-format and gersemi (Linuxbrew)
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew update
           brew install clang-format gersemi
           echo "$(brew --prefix clang-format)/bin" >> "$GITHUB_PATH"
@@ -54,7 +55,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           mapfile -t cmake_files < <(git ls-files \
             'CMakeLists.txt' '*.cmake')
 
@@ -70,45 +70,34 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ARCH: x86_64
-      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install latest CMake (Linuxbrew)
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew update
+          brew install cmake
+          echo "$(brew --prefix cmake)/bin" >> "$GITHUB_PATH"
+          cmake --version
 
       - name: Install tooling dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build clang clang-tidy
 
-      - name: Resolve vcpkg toolchain
-        id: vcpkg
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidates=()
-          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
-          fi
-          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          echo "Unable to locate vcpkg toolchain file on runner." >&2
-          exit 1
-
-      - name: Cache vcpkg and CMake deps
+      - name: Cache CMake deps
         uses: actions/cache@v4
         with:
           path: |
-            build/tooling/vcpkg_installed
             build/tooling/_deps
           key: >-
-            tooling-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json', '.clang-tidy', '.clang-format') }}
+            tooling-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', '.clang-tidy', '.clang-format') }}
 
       - name: Configure
         shell: bash
@@ -117,9 +106,7 @@ jobs:
           cmake -B build/tooling -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
-            -DVCPKG_TARGET_TRIPLET=arch-env
+            -DCMAKE_CXX_COMPILER=clang++
 
       - name: Build
         run: cmake --build build/tooling
@@ -127,172 +114,56 @@ jobs:
       - name: Test
         run: ctest --test-dir build/tooling --output-on-failure
 
-  sanitizer-asan-ubsan-lsan:
-    name: Sanitizer ASAN+UBSAN+LSAN
+  sanitizer:
+    name: Sanitizer ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ASAN+UBSAN+LSAN
+            build_dir: build/asan
+            c_flags: -fsanitize=address,undefined,leak -fno-omit-frame-pointer
+            cxx_flags: -fsanitize=address,undefined,leak -fno-omit-frame-pointer
+            exe_linker_flags: -fsanitize=address,undefined,leak
+            shared_linker_flags: -fsanitize=address,undefined,leak
+            requires_rtsan_probe: false
+          - name: TSAN
+            build_dir: build/tsan
+            c_flags: -fsanitize=thread -fno-omit-frame-pointer
+            cxx_flags: -fsanitize=thread -fno-omit-frame-pointer
+            exe_linker_flags: -fsanitize=thread
+            shared_linker_flags: -fsanitize=thread
+            requires_rtsan_probe: false
+          - name: RTSAN
+            build_dir: build/rtsan
+            c_flags: -fsanitize=realtime -fno-omit-frame-pointer
+            cxx_flags: -fsanitize=realtime -fno-omit-frame-pointer
+            exe_linker_flags: -fsanitize=realtime
+            shared_linker_flags: -fsanitize=realtime
+            requires_rtsan_probe: true
     env:
       ARCH: x86_64
-      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Linuxbrew LLVM
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install Homebrew packages
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew update
-          brew install llvm
+          brew install cmake llvm
+          echo "$(brew --prefix cmake)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          cmake --version
           clang --version
-
-      - name: Resolve vcpkg toolchain
-        id: vcpkg
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidates=()
-          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
-          fi
-          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          echo "Unable to locate vcpkg toolchain file on runner." >&2
-          exit 1
-
-      - name: Configure
-        shell: bash
-        run: |
-          set -euo pipefail
-          cmake -B build/asan -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
-            -DVCPKG_TARGET_TRIPLET=arch-env \
-            -DCMAKE_C_FLAGS="-fsanitize=address,undefined,leak -fno-omit-frame-pointer" \
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined,leak -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined,leak" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined,leak"
-
-      - name: Build
-        run: cmake --build build/asan
-
-      - name: Test
-        run: ctest --test-dir build/asan --output-on-failure
-
-  sanitizer-tsan:
-    name: Sanitizer TSAN
-    runs-on: ubuntu-latest
-    env:
-      ARCH: x86_64
-      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Linuxbrew LLVM
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew update
-          brew install llvm
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          clang --version
-
-      - name: Resolve vcpkg toolchain
-        id: vcpkg
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidates=()
-          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
-          fi
-          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          echo "Unable to locate vcpkg toolchain file on runner." >&2
-          exit 1
-
-      - name: Configure
-        shell: bash
-        run: |
-          set -euo pipefail
-          cmake -B build/tsan -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
-            -DVCPKG_TARGET_TRIPLET=arch-env \
-            -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
-            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=thread"
-
-      - name: Build
-        run: cmake --build build/tsan
-
-      - name: Test
-        run: ctest --test-dir build/tsan --output-on-failure
-
-  sanitizer-rtsan:
-    name: Sanitizer RTSAN
-    runs-on: ubuntu-latest
-    env:
-      ARCH: x86_64
-      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Linuxbrew LLVM
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew update
-          brew install llvm
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          clang --version
-
-      - name: Resolve vcpkg toolchain
-        id: vcpkg
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidates=()
-          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
-          fi
-          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
-
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          echo "Unable to locate vcpkg toolchain file on runner." >&2
-          exit 1
 
       - name: Probe realtime sanitizer support
+        if: matrix.requires_rtsan_probe
         id: rtsan-probe
         shell: bash
         run: |
@@ -308,30 +179,28 @@ jobs:
           fi
 
       - name: Configure
-        if: steps.rtsan-probe.outputs.supported == 'true'
+        if: ${{ !matrix.requires_rtsan_probe || steps.rtsan-probe.outputs.supported == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          cmake -B build/rtsan -G Ninja \
+          cmake -B ${{ matrix.build_dir }} -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.toolchain }}" \
-            -DVCPKG_TARGET_TRIPLET=arch-env \
-            -DCMAKE_C_FLAGS="-fsanitize=realtime -fno-omit-frame-pointer" \
-            -DCMAKE_CXX_FLAGS="-fsanitize=realtime -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=realtime" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=realtime"
+            -DCMAKE_C_FLAGS="${{ matrix.c_flags }}" \
+            -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.exe_linker_flags }}" \
+            -DCMAKE_SHARED_LINKER_FLAGS="${{ matrix.shared_linker_flags }}"
 
       - name: Build
-        if: steps.rtsan-probe.outputs.supported == 'true'
-        run: cmake --build build/rtsan
+        if: ${{ !matrix.requires_rtsan_probe || steps.rtsan-probe.outputs.supported == 'true' }}
+        run: cmake --build ${{ matrix.build_dir }}
 
       - name: Test
-        if: steps.rtsan-probe.outputs.supported == 'true'
-        run: ctest --test-dir build/rtsan --output-on-failure
+        if: ${{ !matrix.requires_rtsan_probe || steps.rtsan-probe.outputs.supported == 'true' }}
+        run: ctest --test-dir ${{ matrix.build_dir }} --output-on-failure
 
       - name: RTSAN unavailable note
-        if: steps.rtsan-probe.outputs.supported != 'true'
+        if: ${{ matrix.requires_rtsan_probe && steps.rtsan-probe.outputs.supported != 'true' }}
         run: |
           echo "RTSAN is not supported by this LLVM toolchain; skipping job payload."

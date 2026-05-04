@@ -53,7 +53,6 @@ jobs:
       windows_preset: windows-msvc-ninja-release
       windows_artifact_dir: build/windows-msvc-ninja-release
       run_tests: true
-      include_clang_tidy_linux: true
       artifact_prefix: release
       cache_key_prefix: release-
 

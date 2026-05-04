@@ -1,18 +1,22 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.0)
 
-set(_version "0.8.0")
+set(_version "0.0.0")
 find_package(Git QUIET)
 if(GIT_FOUND)
     execute_process(
-        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        COMMAND ${GIT_EXECUTABLE} tag --list --sort=-version:refname
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE _git_tag
+        OUTPUT_VARIABLE _git_tags
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
     )
-    if(_git_tag MATCHES "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?")
-        string(REGEX REPLACE "[^0-9.]" "" _version "${_git_tag}")
-    endif()
+    string(REPLACE "\n" ";" _git_tags "${_git_tags}")
+    foreach(_git_tag IN LISTS _git_tags)
+        if(_git_tag MATCHES "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?$")
+            string(REGEX REPLACE "[^0-9.]" "" _version "${_git_tag}")
+            break()
+        endif()
+    endforeach()
 endif()
 
 project(reallm VERSION ${_version} LANGUAGES C CXX)
@@ -74,11 +78,6 @@ target_link_libraries(reaper-sdk INTERFACE WDL::WDL)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
-
-if(VCPKG_TOOLCHAIN)
-    set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release)
-    set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
-endif()
 
 add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
