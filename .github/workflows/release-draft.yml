@@ -2,12 +2,6 @@ name: Release Draft
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to release from (branch, tag, or SHA; defaults to selected branch)
-        required: false
-        default: ""
-        type: string
 
 permissions:
   contents: write
@@ -24,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
