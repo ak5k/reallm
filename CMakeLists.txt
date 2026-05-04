@@ -38,6 +38,7 @@ add_library(${PROJECT_NAME} SHARED)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(cmake/reaper-plugin.cmake)
 include(cmake/tests.cmake)
+include(cmake/clang-tidy.cmake)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 list(FILTER SOURCES EXCLUDE REGEX "_test\\.cpp$")
@@ -47,40 +48,6 @@ target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/main.cpp")
 
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
-
-function(configure_target_clang_tidy target_name tidy_command)
-    if(TARGET ${target_name})
-        set_target_properties(
-            ${target_name}
-            PROPERTIES CXX_CLANG_TIDY "${tidy_command}"
-        )
-    endif()
-endfunction()
-
-set(_clang_tidy_enabled TRUE)
-if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES ";")
-    set(_clang_tidy_enabled FALSE)
-endif()
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(_clang_tidy_enabled FALSE)
-endif()
-
-if(_clang_tidy_enabled)
-    set(_clang_tidy_command "clang-tidy")
-    if(WIN32)
-        # MSVC release flags (for example /GL) are not understood by clang-tidy's
-        # compile simulation and can be reported as unused command-line arguments.
-        string(
-            APPEND _clang_tidy_command
-            ";--extra-arg=-Wno-unused-command-line-argument"
-        )
-    endif()
-
-    configure_target_clang_tidy(${PROJECT_NAME}_lib "${_clang_tidy_command}")
-    configure_target_clang_tidy(${PROJECT_NAME} "${_clang_tidy_command}")
-    configure_target_clang_tidy(${PROJECT_NAME}_tests "${_clang_tidy_command}")
-endif()
-unset(_clang_tidy_enabled)
 
 if(MSVC)
     target_compile_options(
