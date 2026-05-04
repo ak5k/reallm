@@ -3,24 +3,55 @@ name: Release Draft
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag name for the draft release (example: v0.9.0)"
-        required: true
-        type: string
       ref:
-        description: Git ref to build (branch, tag, or commit SHA)
+        description: Git ref to release from (branch, tag, or SHA; defaults to selected branch)
         required: false
-        default: main
+        default: ""
         type: string
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
+  prepare-release:
+    name: Determine version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      released: ${{ steps.tag.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install dependencies
+        run: npm clean-install
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+      - name: Capture release tag
+        id: tag
+        run: |
+          tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "released=$([[ -n $tag ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   build-release-assets:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.released == 'true'
     uses: ./.github/workflows/build-matrix.yml
     with:
-      checkout_ref: ${{ inputs.ref }}
+      checkout_ref: ${{ needs.prepare-release.outputs.tag }}
       build_type: Release
       windows_preset: windows-msvc-ninja-release
       windows_artifact_dir: build/windows-msvc-ninja-release
@@ -32,11 +63,10 @@ jobs:
       matrix: >-
         {"include":[{"name":"linux-x86_64","os":"ubuntu-latest","platform":"linux","arch":"x86_64","triplet":"arch-env"},{"name":"linux-i686","os":"ubuntu-latest","platform":"linux","arch":"i686","triplet":"arch-env"},{"name":"linux-armv7l","os":"ubuntu-latest","platform":"linux","arch":"armv7l","triplet":"arch-env"},{"name":"linux-aarch64","os":"ubuntu-latest","platform":"linux","arch":"aarch64","triplet":"arch-env"},{"name":"windows-x64","os":"windows-2022","platform":"windows","arch":"x64","msvc_arch":"x64","triplet":"x64-windows-static"},{"name":"windows-x86","os":"windows-2022","platform":"windows","arch":"x86","msvc_arch":"x86","triplet":"x86-windows-static"},{"name":"windows-arm64ec","os":"windows-2022","platform":"windows","arch":"arm64ec","msvc_arch":"amd64_arm64","triplet":"arm64ec-windows-static"},{"name":"macos-x86_64","os":"macos-13","platform":"macos","arch":"x86_64","triplet":"arch-env"},{"name":"macos-i386","os":"macos-13","platform":"macos","arch":"i386","triplet":"arch-env","allow_failure":true},{"name":"macos-arm64","os":"macos-14","platform":"macos","arch":"arm64","triplet":"arch-env"}]}
 
-  create-draft-release:
-    name: Create draft release
+  upload-artifacts:
+    name: Upload artifacts to draft release
     runs-on: ubuntu-latest
-    needs:
-      - build-release-assets
+    needs: [prepare-release, build-release-assets]
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -45,13 +75,11 @@ jobs:
           merge-multiple: true
           path: release-artifacts
 
-      - name: Create or update draft release
+      - name: Upload artifacts to draft release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
-          target_commitish: ${{ inputs.ref }}
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
           draft: true
-          prerelease: false
           generate_release_notes: false
           files: |
             release-artifacts/reaper_*.dll
