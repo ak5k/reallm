@@ -1,6 +1,9 @@
 ---
 version: "{build}-{branch}"
 
+skip_commits:
+  message: /.*/
+
 build_script:
   - cmake -B build -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN
