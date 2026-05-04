@@ -12,8 +12,13 @@ if(GIT_FOUND)
     )
     string(REPLACE "\n" ";" _git_tags "${_git_tags}")
     foreach(_git_tag IN LISTS _git_tags)
-        if(_git_tag MATCHES "^v?[0-9]+\\.[0-9]+(\\.[0-9]+)?$")
-            string(REGEX REPLACE "[^0-9.]" "" _version "${_git_tag}")
+        if(_git_tag MATCHES "^v?[0-9]+\\.[0-9]+\\.[0-9]+")
+            string(
+                REGEX MATCH "^v?[0-9]+\\.[0-9]+\\.[0-9]+"
+                _version_prefix
+                "${_git_tag}"
+            )
+            string(REGEX REPLACE "^v" "" _version "${_version_prefix}")
             break()
         endif()
     endforeach()

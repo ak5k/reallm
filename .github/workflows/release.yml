@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    name: Determine version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      released: ${{ steps.tag.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          npx
+          --package semantic-release@24
+          --package @semantic-release/commit-analyzer@13
+          --package @semantic-release/release-notes-generator@14
+          --package @semantic-release/changelog@6
+          --package @semantic-release/git@10
+          --package @semantic-release/github@11
+          semantic-release
+
+      - name: Capture release tag
+        id: tag
+        run: |
+          tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "released=$([[ -n $tag ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Delete older RC draft/prereleases and tags
+        if: steps.tag.outputs.released == 'true'
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const releaseTag = process.env.RELEASE_TAG ?? "";
+            const match = releaseTag.match(/^v?(\d+\.\d+\.\d+)-rc\.(\d+)$/i);
+            if (!match) {
+              core.info(`Release tag ${releaseTag} is not an RC tag, skipping cleanup.`);
+              return;
+            }
+
+            const [_, version, currentRcRaw] = match;
+            const currentRc = Number.parseInt(currentRcRaw, 10);
+            const rcPrefix = `v${version}-rc.`;
+            core.info(`Cleaning older RC releases for ${rcPrefix}* (current RC: ${currentRc}).`);
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            for (const release of releases) {
+              const candidateTag = release.tag_name ?? "";
+              if (!candidateTag.startsWith(rcPrefix)) {
+                continue;
+              }
+
+              const candidateMatch = candidateTag.match(/^v?\d+\.\d+\.\d+-rc\.(\d+)$/i);
+              if (!candidateMatch) {
+                continue;
+              }
+
+              const candidateRc = Number.parseInt(candidateMatch[1], 10);
+              if (candidateRc >= currentRc) {
+                continue;
+              }
+
+              if (!(release.draft || release.prerelease)) {
+                core.info(`Keeping ${candidateTag}: not draft/prerelease.`);
+                continue;
+              }
+
+              core.info(`Deleting release ${candidateTag} (id: ${release.id}).`);
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+              });
+
+              try {
+                core.info(`Deleting tag ${candidateTag}.`);
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${candidateTag}`,
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`Tag ${candidateTag} already deleted.`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+  build-release-assets:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.released == 'true'
+    uses: ./.github/workflows/build-matrix.yml
+    with:
+      checkout_ref: ${{ needs.prepare-release.outputs.tag }}
+      build_type: Release
+      windows_preset: windows-msvc-ninja-release
+      windows_artifact_dir: build/windows-msvc-ninja-release
+      run_tests: true
+      artifact_prefix: release
+      cache_key_prefix: release-
+
+  upload-artifacts:
+    name: Upload artifacts to release
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-release-assets]
+    if: needs.prepare-release.outputs.released == 'true'
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-artifacts
+
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          draft: true
+          generate_release_notes: false
+          files: |
+            release-artifacts/reaper_*.dll
+            release-artifacts/reaper_*.pdb
+            release-artifacts/reaper_*.so
+            release-artifacts/reaper_*.dylib
+          fail_on_unmatched_files: false
+          overwrite_files: true
