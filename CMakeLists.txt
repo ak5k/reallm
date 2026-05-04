@@ -29,34 +29,15 @@ project(reallm VERSION ${_version} LANGUAGES C CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
-
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest
-    GIT_TAG v1.17.0
-    SYSTEM
-)
-
-set(INSTALL_GTEST OFF)
-FetchContent_MakeAvailable(googletest)
-
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 
 add_library(${PROJECT_NAME}_lib STATIC)
 add_library(${PROJECT_NAME} SHARED)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(cmake/reaper-plugin.cmake)
-
-enable_testing()
-include(GoogleTest)
+include(cmake/tests.cmake)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 list(FILTER SOURCES EXCLUDE REGEX "_test\\.cpp$")
@@ -66,20 +47,6 @@ target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/main.cpp")
 
 target_link_libraries(${PROJECT_NAME}_lib PRIVATE reaper-sdk)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib reaper-sdk)
-
-file(
-    GLOB_RECURSE _test_sources
-    CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/src/*_test.cpp"
-)
-if(_test_sources)
-    add_executable(${PROJECT_NAME}_tests ${_test_sources})
-    target_link_libraries(
-        ${PROJECT_NAME}_tests
-        PRIVATE ${PROJECT_NAME}_lib GTest::gtest_main
-    )
-    gtest_discover_tests(${PROJECT_NAME}_tests DISCOVERY_MODE PRE_TEST)
-endif()
 
 function(configure_target_clang_tidy target_name tidy_command)
     if(TARGET ${target_name})
@@ -115,75 +82,16 @@ if(_clang_tidy_enabled)
 endif()
 unset(_clang_tidy_enabled)
 
-target_compile_definitions(
-    ${PROJECT_NAME}_lib
-    PRIVATE
-        REALLM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-        REALLM_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-        REALLM_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-)
-
 if(MSVC)
-    foreach(
-        arg
-        CMAKE_C_FLAGS_DEBUG
-        CMAKE_CXX_FLAGS_DEBUG
-        CMAKE_C_FLAGS_RELEASE
-        CMAKE_CXX_FLAGS_RELEASE
-        CMAKE_C_FLAGS_RELWITHDEBINFO
-        CMAKE_CXX_FLAGS_RELWITHDEBINFO
-        CMAKE_C_FLAGS_MINSIZEREL
-        CMAKE_CXX_FLAGS_MINSIZEREL
-    )
-        # Embed debug information in the object files
-        string(REGEX REPLACE "/Z[iI]" "/Z7" ${arg} "${${arg}}")
-    endforeach()
-
-    add_compile_options(
-        # Exception handling model
-        /EHsc
-        # Enhance optimized debugging
-        $<$<NOT:$<CONFIG:Debug>>:/Zo>
-        # Eliminate duplicate strings
-        $<$<NOT:$<CONFIG:Debug>>:/GF>
-        # Enable function-level linking
-        $<$<NOT:$<CONFIG:Debug>>:/Gy>
-        # Remove unreferenced COMDAT
-        $<$<NOT:$<CONFIG:Debug>>:/Zc:inline>
-    )
-
     target_compile_options(
         ${PROJECT_NAME}_lib
         PRIVATE /W3 /WX /wd4996 /wd4244 /wd4267 /wd4305
     )
-
-    if(NOT CMAKE_PROJECT_VERSION_TWEAK EQUAL "1")
-        add_link_options(
-            # Remove unreferenced code
-            $<$<NOT:$<CONFIG:Debug>>:/OPT:REF>
-            # Remove duplicate sections
-            $<$<NOT:$<CONFIG:Debug>>:/OPT:ICF>
-            # Use relative path to the PDB file to avoid exposing the full path
-            /PDBALTPATH:%_PDB%
-        )
-    endif()
 else()
     target_compile_options(
         ${PROJECT_NAME}_lib
-        PUBLIC
-            -fsigned-char
-            -fstack-protector-strong
-            -fdiagnostics-color
-            -Wall
-            -Wextra
-            -Werror
-            -Wno-conversion
-            -Wno-sign-conversion
+        PUBLIC -Wall -Wextra -Werror -Wno-conversion -Wno-sign-conversion
     )
-endif()
-
-if(WIN32)
-    target_compile_definitions(${PROJECT_NAME}_lib PUBLIC NOMINMAX UNICODE)
 endif()
 
 include(cmake/cpack.cmake)
