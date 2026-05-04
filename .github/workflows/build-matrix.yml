@@ -137,11 +137,11 @@ jobs:
     steps:
       - name: Checkout (default ref)
         if: inputs.checkout_ref == ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout (requested ref)
         if: inputs.checkout_ref != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.checkout_ref }}
 
@@ -203,7 +203,7 @@ jobs:
           }
 
       - name: Cache CMake deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/_deps
@@ -451,7 +451,7 @@ jobs:
 
       - name: Upload Linux artifacts
         if: always() && matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: |
@@ -461,7 +461,7 @@ jobs:
 
       - name: Upload macOS artifacts
         if: always() && matrix.platform == 'macos'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: |
@@ -471,7 +471,7 @@ jobs:
 
       - name: Upload Windows artifacts
         if: always() && matrix.platform == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: |

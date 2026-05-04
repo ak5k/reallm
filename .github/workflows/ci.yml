@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main
@@ -72,7 +72,7 @@ jobs:
       ARCH: x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main
@@ -92,7 +92,7 @@ jobs:
           sudo apt-get install -y ninja-build clang clang-tidy
 
       - name: Cache CMake deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/tooling/_deps
@@ -146,7 +146,7 @@ jobs:
       ARCH: x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main
