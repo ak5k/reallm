@@ -9,7 +9,26 @@ Use `ReaLlm: Low latency monitoring` REAPER action list toggle to enable/disable
 Also provides REAPER API functions for ReaScripting.
 API documentation available in REAPER Help > ReaScript documentation...
 
-### Installation 
+### CMake presets (Windows)
+
+The shared `windows-msvc` configure preset intentionally does not pin a Visual Studio generator version.
+Use either Visual Studio or Ninja:
+
+Visual Studio (choose installed version at configure time):
+
+```powershell
+cmake --preset windows-msvc -G "Visual Studio 17 2022"
+cmake --build --preset windows-msvc-release
+```
+
+Ninja:
+
+```powershell
+cmake --preset windows-msvc-ninja-release
+cmake --build --preset windows-msvc-ninja-release
+```
+
+### Installation
 
 Install from [ReaPack](https://reapack.com) or download [latest release](https://github.com/ak5k/reallm/releases/latest) for your computer architecture (e.g. `x64.dll` for 64-bit Windows PC or `arm64.dylib` for M1 Mac) and place it in your REAPER `UserPlugins` directory.
 

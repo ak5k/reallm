@@ -1,7 +1,8 @@
-#include "reallm.hpp"
-#include "Network.hpp"
-#include "reaper_vararg.hpp"
+#include "reallm.h"
+#include "network.h"
+#include "reaper_vararg.h"
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -11,6 +12,7 @@
 #include <WDL/wdltypes.h>
 #include <reaper_plugin_functions.h>
 
+// NOLINTBEGIN(bugprone-throwing-static-initialization,bugprone-unused-local-non-trivial-variable)
 namespace reallm
 {
 
@@ -63,10 +65,7 @@ static inline T max(T a, T b)
 struct ParameterChange
 {
     ParameterChange(const char* fx_name, int parameter_index, double val1, double val2)
-        : fx_name(fx_name)
-        , parameter_index(parameter_index)
-        , val1(val1)
-        , val2(val2)
+        : fx_name(fx_name), parameter_index(parameter_index), val1(val1), val2(val2)
     {
     }
 
@@ -81,21 +80,12 @@ std::vector<ParameterChange> parameter_changes;
 class TrackFx
 {
 public:
-    TrackFx()
-        : g(nullptr)
-        , tr(nullptr)
-        , fx_index(-1)
-        , isSafe(false)
-        , buf{}
+    TrackFx() : g(nullptr), tr(nullptr), fx_index(-1), isSafe(false), buf{}
     {
     }
 
     TrackFx(GUID* g, MediaTrack* tr, int fx_index)
-        : g(g)
-        , tr(tr)
-        , fx_index(fx_index)
-        , isSafe(false)
-        , buf{}
+        : g(g), tr(tr), fx_index(fx_index), isSafe(false), buf{}
     {
     }
 
@@ -253,14 +243,14 @@ std::unordered_map<GUID*, TrackFx> fx_map;
 std::unordered_set<TrackFx*> fx_set_prev;
 
 std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack);
-std::vector<std::vector<MediaTrack*>> findAllPaths(
-    Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks, std::vector<MediaTrack*>& outputTracks
-);
+std::vector<std::vector<MediaTrack*>> findAllPaths(Network<MediaTrack*>& network,
+                                                   std::vector<MediaTrack*>& inputTracks,
+                                                   std::vector<MediaTrack*>& outputTracks);
 int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackFx*>& fx_set);
 std::string serializeFxSet(std::unordered_set<TrackFx*>& fx_to_disable);
 std::unordered_set<TrackFx*> deserializeFxSet(const std::string& serialized);
 
-enum class RuntimePhase
+enum RuntimePhase : uint8_t
 {
     Idle,
     BuildSnapshot,
@@ -390,7 +380,7 @@ void appendTrackToPendingSnapshot(RuntimeState& rt, int trackIndex, char* buf)
         if (trackIndex == num_tracks && include_monitoring_fx && idx >= TrackFX_GetCount(tr))
             idx = idx - TrackFX_GetCount(tr) + 0x1000000;
 
-        auto g = TrackFX_GetFXGUID(tr, idx);
+        auto* g = TrackFX_GetFXGUID(tr, idx);
         rt.pendingFxMap[g] = TrackFx(g, tr, idx);
 
         TrackFX_GetFXName(tr, idx, buf, BUFSIZ);
@@ -710,7 +700,9 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
     for (int j = 0; j < numSends; j++)
     {
         MediaTrack* destinationTrack{nullptr};
-        destinationTrack = (MediaTrack*)(UINT_PTR)GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
+        destinationTrack =
+            // NOLINTNEXTLINE
+            (MediaTrack*)(UINT_PTR)GetTrackSendInfo_Value(sourceTrack, 0, j, "P_DESTTRACK");
         bool isSendMuted = (bool)GetTrackSendInfo_Value(sourceTrack, 0, j, "B_MUTE");
         if (!isSendMuted)
             destinationTracks.push_back(destinationTrack);
@@ -738,14 +730,9 @@ std::vector<MediaTrack*> GetAllTrackSendDestinations(MediaTrack* sourceTrack)
     return destinationTracks;
 }
 
-void dfs(
-    Network<MediaTrack*>& network,
-    MediaTrack* currentTrack,
-    MediaTrack* targetTrack,
-    std::vector<MediaTrack*>& visited,
-    std::vector<MediaTrack*>& path,
-    std::vector<std::vector<MediaTrack*>>& allPaths
-)
+void dfs(Network<MediaTrack*>& network, MediaTrack* currentTrack, MediaTrack* targetTrack,
+         std::vector<MediaTrack*>& visited, std::vector<MediaTrack*>& path,
+         std::vector<std::vector<MediaTrack*>>& allPaths)
 {
     visited.push_back(currentTrack);
     path.push_back(currentTrack);
@@ -762,11 +749,12 @@ void dfs(
     }
 
     path.pop_back();
+    visited.pop_back();
 }
 
-std::vector<std::vector<MediaTrack*>> findAllPaths(
-    Network<MediaTrack*>& network, std::vector<MediaTrack*>& inputTracks, std::vector<MediaTrack*>& outputTracks
-)
+std::vector<std::vector<MediaTrack*>> findAllPaths(Network<MediaTrack*>& network,
+                                                   std::vector<MediaTrack*>& inputTracks,
+                                                   std::vector<MediaTrack*>& outputTracks)
 {
     std::vector<std::vector<MediaTrack*>> allPaths;
 
@@ -809,7 +797,8 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
         auto* g = TrackFX_GetFXGUID(tr, i);
         auto fx_pdc = fx_map[g].getPdc();
         auto flicker{false};
-        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_pdc == 0 && !TrackFX_GetEnabled(tr, i))
+        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_pdc == 0 &&
+            !TrackFX_GetEnabled(tr, i))
         {
             fx_set.insert(&fx_map[g]);
             flicker = true;
@@ -818,7 +807,8 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
             fx_pdc = 0;
         if (!flicker && fx_pdc == 0)
             continue;
-        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_map[g].getSafe() && !TrackFX_GetEnabled(tr, i))
+        if (fx_set_prev.find(&fx_map[g]) != fx_set_prev.end() && fx_map[g].getSafe() &&
+            !TrackFX_GetEnabled(tr, i))
         {
             fx_map[g].setSafe(false);
         }
@@ -832,7 +822,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
         // classic pdc
         if (pdc_mode == 0 && keep_pdc)
         {
-            fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : (fx_pdc / bsize + 1) * bsize;
+            fx_pdc = fx_pdc % bsize == 0 ? fx_pdc : ((fx_pdc / bsize) + 1) * bsize;
             if (pdc + fx_pdc > pdc_limit && !fx_map[g].getSafe())
                 fx_set.insert(&fx_map[g]);
             else
@@ -843,7 +833,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
         if (pdc_mode == 1 && keep_pdc)
         {
             tr_pdc += fx_pdc;
-            auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
+            auto temp = tr_pdc % bsize == 0 ? tr_pdc : ((tr_pdc / bsize) + 1) * bsize;
             if (pdc + temp > pdc_limit && !fx_map[g].getSafe())
             {
                 tr_pdc -= fx_pdc;
@@ -864,7 +854,7 @@ int CalculateTrackPdc(MediaTrack* tr, int initial_pdc, std::unordered_set<TrackF
     }
     if (pdc_mode == 1)
     {
-        auto temp = tr_pdc % bsize == 0 ? tr_pdc : (tr_pdc / bsize + 1) * bsize;
+        auto temp = tr_pdc % bsize == 0 ? tr_pdc : ((tr_pdc / bsize) + 1) * bsize;
         pdc += temp;
     }
 
@@ -989,7 +979,8 @@ void main()
         no_renaming = true;
 }
 
-const char* defstring_SetPdcLimit = "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
+const char* defstring_SetPdcLimit =
+    "void\0double\0pdc_factor\0Set pdc limit as factor of audio buffer size.";
 
 void SetPdcLimit(double limit)
 {
@@ -1007,10 +998,9 @@ void SetMonitoringFX(bool enable)
     include_monitoring_fx = enable;
 }
 
-const char* defstring_SetClearSafe =
-    "void\0bool\0clear_manually_safed_fx\0"
-    "Set clear safe. Set clear_manually_safed_"
-    "fx = true to clear manually safed fx";
+const char* defstring_SetClearSafe = "void\0bool\0clear_manually_safed_fx\0"
+                                     "Set clear safe. Set clear_manually_safed_"
+                                     "fx = true to clear manually safed fx";
 
 void SetClearSafe(bool clear_manually_safed_fx)
 {
@@ -1079,9 +1069,8 @@ const char* defstring_GetPaths =
     "hardware output tracks are used. If includeFx is true, the fx indices are "
     "included.";
 
-void GetPaths(
-    bool includeFx, MediaTrack* startInOptional, MediaTrack* endInOptional, char* pathStringOut, int pathStringOut_sz
-)
+void GetPaths(bool includeFx, MediaTrack* startInOptional, MediaTrack* endInOptional,
+              char* pathStringOut, int pathStringOut_sz)
 {
     std::string result;
     std::vector<MediaTrack*> start_points;
@@ -1112,7 +1101,8 @@ void GetPaths(
                 for (int k = 0; k < fx_count; k++)
                 {
                     auto idx = k;
-                    if (j == GetMasterTrack(NULL) && include_monitoring_fx && idx >= TrackFX_GetCount(j))
+                    if (j == GetMasterTrack(NULL) && include_monitoring_fx &&
+                        idx >= TrackFX_GetCount(j))
                         idx = idx - TrackFX_GetCount(j) + 0x1000000;
                     char buf[BUFSIZ];
                     TrackFX_GetNamedConfigParm(j, idx, "renamed_name", buf, BUFSIZ);
@@ -1159,8 +1149,10 @@ void GetSafed(char* safeStringOut, int safeStringOut_sz)
         {
             if (ValidatePtr2(0, i.second.getTrack(), "MediaTrack*"))
             {
-                auto num_track = (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
-                result += std::to_string(num_track) + ":" + std::to_string(i.second.getFxIndex() + 1) + ";";
+                auto num_track =
+                    (int)GetMediaTrackInfo_Value(i.second.getTrack(), "IP_TRACKNUMBER");
+                result += std::to_string(num_track) + ":" +
+                          std::to_string(i.second.getFxIndex() + 1) + ";";
             }
         }
     }
@@ -1193,8 +1185,6 @@ void SetSafed(const char* fx_name, bool isSet)
         safed_fx_names.erase(fx_name);
 }
 
-#include "config.h"
-
 const char* defstring_GetVersion =
     "void\0int*,int*,int*,int*,char*,int\0"
     "majorOut,minorOut,patchOut,buildOut,commitOut,commitOut_sz"
@@ -1202,15 +1192,26 @@ const char* defstring_GetVersion =
     "Get version. Returns the version of the plugin as integers and the commit "
     "hash as a string. The string is truncated to commitOut_sz.";
 
-void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut, int commitOut_sz)
+void GetVersion(int* majorOut, int* minorOut, int* patchOut, int* buildOut, char* commitOut,
+                int commitOut_sz)
 {
-    *majorOut = PROJECT_VERSION_MAJOR;
-    *minorOut = PROJECT_VERSION_MINOR;
-    *patchOut = PROJECT_VERSION_PATCH;
-    *buildOut = PROJECT_VERSION_TWEAK;
-    const char* commit = PROJECT_VERSION_COMMIT;
-    std::copy(commit, commit + min(commitOut_sz - 1, (int)strlen(commit)), commitOut);
-    commitOut[min(commitOut_sz - 1, (int)strlen(commit))] = '\0'; // Ensure null termination
+    if (majorOut)
+        *majorOut = REALLM_VERSION_MAJOR;
+    if (minorOut)
+        *minorOut = REALLM_VERSION_MINOR;
+    if (patchOut)
+        *patchOut = REALLM_VERSION_PATCH;
+    if (buildOut)
+        *buildOut = REALLM_VERSION_BUILD;
+
+    if (!commitOut || commitOut_sz <= 0)
+        return;
+
+    const char* commit = REALLM_VERSION_COMMIT;
+    auto commit_len = (int)strlen(commit);
+    auto copy_len = min(commitOut_sz - 1, commit_len);
+    std::copy(commit, commit + copy_len, commitOut);
+    commitOut[copy_len] = '\0';
 }
 
 void Register()
@@ -1227,40 +1228,48 @@ void Register()
 
     plugin_register("API_Llm_GetVersion", (void*)GetVersion);
     plugin_register("APIdef_Llm_GetVersion", (void*)defstring_GetVersion);
-    plugin_register("APIvararg_Llm_GetVersion", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>));
+    plugin_register("APIvararg_Llm_GetVersion",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetVersion>));
 
     plugin_register("API_Llm_SetSafed", (void*)SetSafed);
     plugin_register("APIdef_Llm_SetSafed", (void*)defstring_SetSafed);
-    plugin_register("APIvararg_Llm_SetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>));
+    plugin_register("APIvararg_Llm_SetSafed",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetSafed>));
 
     plugin_register("API_Llm_GetSafed", (void*)GetSafed);
     plugin_register("APIdef_Llm_GetSafed", (void*)defstring_GetSafed);
-    plugin_register("APIvararg_Llm_GetSafed", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>));
+    plugin_register("APIvararg_Llm_GetSafed",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetSafed>));
 
     plugin_register("API_Llm_GetPaths", (void*)GetPaths);
     plugin_register("APIdef_Llm_GetPaths", (void*)defstring_GetPaths);
-    plugin_register("APIvararg_Llm_GetPaths", reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>));
+    plugin_register("APIvararg_Llm_GetPaths",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&GetPaths>));
 
     plugin_register("API_Llm_SetKeepPdc", (void*)SetKeepPdc);
     plugin_register("APIdef_Llm_SetKeepPdc", (void*)defstring_SetKeepPdc);
-    plugin_register("APIvararg_Llm_SetKeepPdc", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>));
+    plugin_register("APIvararg_Llm_SetKeepPdc",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetKeepPdc>));
 
     plugin_register("API_Llm_SetParameterChange", (void*)SetParameterChange);
     plugin_register("APIdef_Llm_SetParameterChange", (void*)defstring_SetParameterChange);
-    plugin_register(
-        "APIvararg_Llm_SetParameterChange", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>)
-    );
+    plugin_register("APIvararg_Llm_SetParameterChange",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetParameterChange>));
 
     plugin_register("API_Llm_SetClearSafe", (void*)SetClearSafe);
     plugin_register("APIdef_Llm_SetClearSafe", (void*)defstring_SetClearSafe);
-    plugin_register("APIvararg_Llm_SetClearSafe", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>));
+    plugin_register("APIvararg_Llm_SetClearSafe",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetClearSafe>));
 
     plugin_register("API_Llm_SetMonitoringFX", (void*)SetMonitoringFX);
     plugin_register("APIdef_Llm_SetMonitoringFX", (void*)defstring_SetMonitoringFX);
-    plugin_register("APIvararg_Llm_SetMonitoringFX", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>));
+    plugin_register("APIvararg_Llm_SetMonitoringFX",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetMonitoringFX>));
 
     plugin_register("API_Llm_SetPdcLimit", (void*)SetPdcLimit);
     plugin_register("APIdef_Llm_SetPdcLimit", (void*)defstring_SetPdcLimit);
-    plugin_register("APIvararg_Llm_SetPdcLimit", reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
+    plugin_register("APIvararg_Llm_SetPdcLimit",
+                    reinterpret_cast<void*>(&InvokeReaScriptAPI<&SetPdcLimit>));
 }
 } // namespace reallm
+// NOLINTEND(bugprone-throwing-static-initialization,bugprone-unused-local-non-trivial-variable)

@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      bump_prerelease:
+        description: "Create a new prerelease number instead of updating the current branch prerelease"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -15,55 +20,125 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       released: ${{ steps.tag.outputs.released }}
+      is_update: ${{ steps.tag.outputs.is_update }}
+      preid: ${{ steps.existing.outputs.preid }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
+      - name: Check for existing branch prerelease
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace("refs/heads/", "");
+            const canUpdatePrerelease = branch !== "main";
+
+            const sanitizePreid = (value) =>
+              value
+                .toLowerCase()
+                .replace(/[^0-9a-z-]/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "") || "prerelease";
+
+            const preid = sanitizePreid(branch);
+            const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const preidPattern = escapeRegex(preid);
+
+            let existingTag = "";
+            if (canUpdatePrerelease) {
+              const releases = await github.paginate(github.rest.repos.listReleases, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              });
+
+              const prereleasePattern = new RegExp(`^v\\d+\\.\\d+\\.\\d+-${preidPattern}\\.\\d+$`, "i");
+              const candidate = releases
+                .filter((r) => prereleasePattern.test(r.tag_name ?? ""))
+                .filter((r) => r.draft || r.prerelease)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+              existingTag = candidate?.tag_name ?? "";
+            }
+
+            const isUpdate =
+              canUpdatePrerelease &&
+              existingTag !== "" &&
+              context.payload.inputs?.bump_prerelease !== "true";
+
+            core.info(
+              `branch=${branch}, preid=${preid}, existing_tag=${existingTag}, is_update=${isUpdate}`,
+            );
+            core.setOutput("preid", preid);
+            core.setOutput("existing_tag", existingTag);
+            core.setOutput("is_update", isUpdate ? "true" : "false");
+
       - uses: actions/setup-node@v4
+        if: steps.existing.outputs.is_update != 'true'
         with:
           node-version: "lts/*"
 
       - name: Release
+        if: steps.existing.outputs.is_update != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           npx
-          --package semantic-release@24
-          --package @semantic-release/commit-analyzer@13
-          --package @semantic-release/release-notes-generator@14
-          --package @semantic-release/changelog@6
-          --package @semantic-release/git@10
-          --package @semantic-release/github@11
+          --package semantic-release
+          --package @semantic-release/commit-analyzer
+          --package @semantic-release/release-notes-generator
+          --package @semantic-release/changelog
+          --package @semantic-release/git
+          --package @semantic-release/github
           semantic-release
 
       - name: Capture release tag
         id: tag
+        env:
+          IS_UPDATE: ${{ steps.existing.outputs.is_update }}
+          EXISTING_TAG: ${{ steps.existing.outputs.existing_tag }}
         run: |
-          tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          if [[ "$IS_UPDATE" == "true" ]]; then
+            tag="$EXISTING_TAG"
+          else
+            tag=$(git tag --points-at HEAD | grep '^v' | head -1)
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "is_update=$IS_UPDATE" >> "$GITHUB_OUTPUT"
           echo "released=$([[ -n $tag ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-      - name: Delete older RC draft/prereleases and tags
-        if: steps.tag.outputs.released == 'true'
+      - name: Delete older branch prerelease drafts and tags
+        if: github.ref_name != 'main' && inputs.bump_prerelease && steps.tag.outputs.released == 'true'
         uses: actions/github-script@v7
         env:
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          PREID: ${{ steps.existing.outputs.preid }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const releaseTag = process.env.RELEASE_TAG ?? "";
-            const match = releaseTag.match(/^v?(\d+\.\d+\.\d+)-rc\.(\d+)$/i);
+            const expectedPreid = process.env.PREID ?? "";
+            const match = releaseTag.match(/^v?(\d+\.\d+\.\d+)-([0-9A-Za-z-]+)\.(\d+)$/i);
             if (!match) {
-              core.info(`Release tag ${releaseTag} is not an RC tag, skipping cleanup.`);
+              core.info(`Release tag ${releaseTag} is not a branch prerelease tag, skipping cleanup.`);
               return;
             }
 
-            const [_, version, currentRcRaw] = match;
-            const currentRc = Number.parseInt(currentRcRaw, 10);
-            const rcPrefix = `v${version}-rc.`;
-            core.info(`Cleaning older RC releases for ${rcPrefix}* (current RC: ${currentRc}).`);
+            const [_, version, tagPreid, currentNumberRaw] = match;
+            if (expectedPreid && tagPreid.toLowerCase() !== expectedPreid.toLowerCase()) {
+              core.info(
+                `Release tag preid ${tagPreid} does not match expected channel ${expectedPreid}, skipping cleanup.`,
+              );
+              return;
+            }
+
+            const currentNumber = Number.parseInt(currentNumberRaw, 10);
+            const prefix = `v${version}-${tagPreid}.`;
+            core.info(`Cleaning older prerelease drafts for ${prefix}* (current: ${currentNumber}).`);
 
             const releases = await github.paginate(github.rest.repos.listReleases, {
               owner: context.repo.owner,
@@ -71,19 +146,20 @@ jobs:
               per_page: 100,
             });
 
+            const versionPattern = new RegExp(
+              `^v?${version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-${tagPreid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.(\\d+)$`,
+              "i",
+            );
+
             for (const release of releases) {
               const candidateTag = release.tag_name ?? "";
-              if (!candidateTag.startsWith(rcPrefix)) {
-                continue;
-              }
-
-              const candidateMatch = candidateTag.match(/^v?\d+\.\d+\.\d+-rc\.(\d+)$/i);
+              const candidateMatch = candidateTag.match(versionPattern);
               if (!candidateMatch) {
                 continue;
               }
 
-              const candidateRc = Number.parseInt(candidateMatch[1], 10);
-              if (candidateRc >= currentRc) {
+              const candidateNumber = Number.parseInt(candidateMatch[1], 10);
+              if (candidateNumber >= currentNumber) {
                 continue;
               }
 
@@ -127,6 +203,10 @@ jobs:
       run_tests: true
       artifact_prefix: release
       cache_key_prefix: release-
+      package_with_cpack: true
+      sign_windows_artifacts: true
+      notarize_macos: true
+    secrets: inherit
 
   upload-artifacts:
     name: Upload artifacts to release
@@ -142,15 +222,37 @@ jobs:
           path: release-artifacts
 
       - name: Upload artifacts to release
+        if: needs.prepare-release.outputs.is_update == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag }}
           draft: true
           generate_release_notes: false
           files: |
-            release-artifacts/reaper_*.dll
-            release-artifacts/reaper_*.pdb
-            release-artifacts/reaper_*.so
-            release-artifacts/reaper_*.dylib
+            release-artifacts/**/*.dll
+            release-artifacts/**/*.pdb
+            release-artifacts/**/*.so
+            release-artifacts/**/*.dylib
+            release-artifacts/**/*.exe
+            release-artifacts/**/*.deb
+            release-artifacts/**/*.pkg
+          fail_on_unmatched_files: false
+          overwrite_files: true
+
+      - name: Upload artifacts to new release
+        if: needs.prepare-release.outputs.is_update != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          draft: true
+          generate_release_notes: false
+          files: |
+            release-artifacts/**/*.dll
+            release-artifacts/**/*.pdb
+            release-artifacts/**/*.so
+            release-artifacts/**/*.dylib
+            release-artifacts/**/*.exe
+            release-artifacts/**/*.deb
+            release-artifacts/**/*.pkg
           fail_on_unmatched_files: false
           overwrite_files: true

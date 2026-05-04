@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+staged_files="$(git diff --cached --name-only --diff-filter=d)"
+
+if [ -z "$staged_files" ]; then
+    exit 0
+fi
+
+cpp_files=()
+cmake_files=()
+
+while IFS= read -r file; do
+    case "$file" in
+        *.c|*.cc|*.cpp|*.cxx|*.h|*.hpp|*.hxx|*.inl)
+            cpp_files+=("$file")
+            ;;
+        CMakeLists.txt|*.cmake)
+            cmake_files+=("$file")
+            ;;
+    esac
+done <<< "$staged_files"
+
+if [ ${#cpp_files[@]} -gt 0 ]; then
+    if command -v clang-format >/dev/null 2>&1; then
+        clang-format -i "${cpp_files[@]}"
+        git add -- "${cpp_files[@]}"
+    else
+        echo "warning: clang-format not found; skipping C/C++ formatting" >&2
+    fi
+fi
+
+if [ ${#cmake_files[@]} -gt 0 ]; then
+    if command -v gersemi >/dev/null 2>&1; then
+        gersemi -i "${cmake_files[@]}"
+        git add -- "${cmake_files[@]}"
+    else
+        echo "warning: gersemi not found; skipping CMake formatting" >&2
+    fi
+fi

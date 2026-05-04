@@ -38,6 +38,40 @@ on:
         required: false
         default: ''
         type: string
+      package_with_cpack:
+        description: Build platform packages with CPack
+        required: false
+        default: false
+        type: boolean
+      sign_windows_artifacts:
+        description: Sign Windows binaries and installer with Azure Artifact Signing when package_with_cpack is enabled
+        required: false
+        default: false
+        type: boolean
+      notarize_macos:
+        description: Notarize macOS package when package_with_cpack is enabled and credentials are available
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      MACOS_NOTARIZATION_USERNAME:
+        required: false
+      MACOS_NOTARIZATION_TEAM_ID:
+        required: false
+      MACOS_NOTARIZATION_PASSWORD:
+        required: false
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_CLIENT_SECRET:
+        required: false
+      AZURE_ENDPOINT:
+        required: false
+      AZURE_TRUSTED_SIGNING_ACCOUNT_NAME:
+        required: false
+      AZURE_CERTIFICATE_PROFILE_NAME:
+        required: false
 
 permissions:
   contents: read
@@ -95,6 +129,10 @@ jobs:
             skip_tests: false
     env:
       ARCH: ${{ matrix.arch }}
+      MACOS_NOTARIZATION_USERNAME: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
+      MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      MACOS_NOTARIZATION_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
     steps:
       - name: Checkout (default ref)
@@ -109,7 +147,7 @@ jobs:
 
       - name: Setup Homebrew Unix
         if: runner.os != 'Windows'
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install Unix Homebrew packages
         if: runner.os != 'Windows'
@@ -122,18 +160,47 @@ jobs:
           echo "$(brew --prefix cmake)/bin" >> "$GITHUB_PATH"
           cmake --version
 
-      - name: Install latest CMake Windows
+      - name: Install CMake and NSIS Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+
           winget install --id Kitware.CMake --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
 
-          $cmakeBin = 'C:\Program Files\CMake\bin'
-          if (Test-Path $cmakeBin) {
-            $cmakeBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $cmakePaths = @(
+            'C:\Program Files\CMake\bin'
+          )
+
+          foreach ($pathEntry in $cmakePaths) {
+            $pathEntry | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            if (-not (($env:Path -split ';') -contains $pathEntry)) {
+              $env:Path = "$pathEntry;$env:Path"
+            }
+          }
+
+          if ('${{ inputs.package_with_cpack }}' -eq 'true') {
+            winget install --id NSIS.NSIS --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
+
+            $nsisPaths = @(
+              'C:\Program Files\NSIS\Bin',
+              'C:\Program Files (x86)\NSIS\Bin',
+              "$env:LOCALAPPDATA\Programs\NSIS\Bin"
+            )
+
+            foreach ($pathEntry in $nsisPaths) {
+              $pathEntry | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              if (-not (($env:Path -split ';') -contains $pathEntry)) {
+                $env:Path = "$pathEntry;$env:Path"
+              }
+            }
           }
 
           cmake --version
+
+          if ('${{ inputs.package_with_cpack }}' -eq 'true') {
+            makensis /VERSION
+          }
 
       - name: Cache CMake deps
         uses: actions/cache@v4
@@ -295,10 +362,82 @@ jobs:
         shell: bash
         run: cmake --build build
 
+      - name: Setup macOS notarytool keychain profile
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials "notarytool-profile" \
+            --apple-id "$MACOS_NOTARIZATION_USERNAME" \
+            --team-id "$MACOS_NOTARIZATION_TEAM_ID" \
+            --password "$MACOS_NOTARIZATION_PASSWORD"
+
+      - name: Configure macOS notarization profile
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build -DNOTARIZE_KEYCHAIN_PROFILE=notarytool-profile
+
+      - name: Build Unix package
+        if: runner.os != 'Windows' && inputs.package_with_cpack
+        shell: bash
+        run: cpack --config build/CPackConfig.cmake
+
+      - name: Notarize macOS package
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: cmake --build build --target notarize
+
+      - name: macOS notarization skipped notice
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME == ''
+        shell: bash
+        run: |
+          echo "Notarization requested, but MACOS_NOTARIZATION_USERNAME is empty. Package was built without notarization."
+
       - name: Build Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: cmake --build --preset ${{ inputs.windows_preset }}
+
+      - name: Sign Windows binaries
+        if: matrix.platform == 'windows' && inputs.package_with_cpack && inputs.sign_windows_artifacts && env.AZURE_TENANT_ID != ''
+        uses: azure/artifact-signing-action@v1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\${{ inputs.windows_artifact_dir }}
+          files-folder-filter: dll,exe
+          files-folder-recurse: false
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Build Windows package
+        if: runner.os == 'Windows' && inputs.package_with_cpack
+        shell: pwsh
+        run: cpack --config ${{ inputs.windows_artifact_dir }}/CPackConfig.cmake
+
+      - name: Sign Windows installer
+        if: matrix.platform == 'windows' && inputs.package_with_cpack && inputs.sign_windows_artifacts && env.AZURE_TENANT_ID != ''
+        uses: azure/artifact-signing-action@v1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\${{ inputs.windows_artifact_dir }}\packages
+          files-folder-filter: exe
+          files-folder-recurse: false
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Test Unix
         if: runner.os != 'Windows' && inputs.run_tests && !matrix.skip_tests
@@ -315,14 +454,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
-          path: build/reaper_*.so
+          path: |
+            build/*.so
+            build/packages/*.deb
+          if-no-files-found: warn
 
       - name: Upload macOS artifacts
         if: always() && matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
-          path: build/reaper_*.dylib
+          path: |
+            build/*.dylib
+            build/packages/*.pkg
+          if-no-files-found: warn
 
       - name: Upload Windows artifacts
         if: always() && matrix.platform == 'windows'
@@ -330,5 +475,7 @@ jobs:
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: |
-            ${{ inputs.windows_artifact_dir }}/reaper_*.dll
-            ${{ inputs.windows_artifact_dir }}/reaper_*.pdb
+            ${{ inputs.windows_artifact_dir }}/*.dll
+            ${{ inputs.windows_artifact_dir }}/*.pdb
+            ${{ inputs.windows_artifact_dir }}/packages/*.exe
+          if-no-files-found: warn

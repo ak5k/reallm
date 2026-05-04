@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install clang-format and gersemi (Linuxbrew)
         shell: bash
@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install latest CMake (Linuxbrew)
         shell: bash
@@ -149,7 +149,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install Homebrew packages
         shell: bash
