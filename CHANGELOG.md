@@ -1,3 +1,11 @@
+# [0.8.0-refactor.2](https://github.com/ak5k/reallm/compare/v0.8.0-refactor.1...v0.8.0-refactor.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **reallm:** test ([4be1364](https://github.com/ak5k/reallm/commit/4be1364c42710a4e8c2d48a549f57d974d77ba6a))
+* **reallm:** test ([166e705](https://github.com/ak5k/reallm/commit/166e705586e2a5e16505feaa1259b9afbd9a212a))
+
 # [0.8.0-refactor.1](https://github.com/ak5k/reallm/compare/v0.7.0...v0.8.0-refactor.1) (2026-05-04)
 
 
