@@ -28,11 +28,6 @@ on:
         required: false
         default: true
         type: boolean
-      include_clang_tidy_linux:
-        description: Install and verify clang-tidy on Linux builds
-        required: false
-        default: true
-        type: boolean
       artifact_prefix:
         description: Optional artifact name prefix
         required: false
@@ -59,56 +54,47 @@ jobs:
             os: ubuntu-latest
             platform: linux
             arch: x86_64
-            triplet: arch-env
             skip_tests: false
           - name: linux-i686
             os: ubuntu-latest
             platform: linux
             arch: i686
-            triplet: arch-env
             skip_tests: true
           - name: linux-armv7l
             os: ubuntu-latest
             platform: linux
             arch: armv7l
-            triplet: arch-env
             skip_tests: true
           - name: linux-aarch64
             os: ubuntu-latest
             platform: linux
             arch: aarch64
-            triplet: arch-env
             skip_tests: true
           - name: windows-x64
             os: windows-latest
             platform: windows
             arch: x64
             msvc_arch: x64
-            triplet: x64-windows-static
             skip_tests: false
           - name: windows-x86
             os: windows-latest
             platform: windows
             arch: x86
             msvc_arch: x86
-            triplet: x86-windows-static
             skip_tests: true
           - name: windows-arm64ec
             os: windows-latest
             platform: windows
             arch: arm64ec
             msvc_arch: amd64_arm64
-            triplet: arm64ec-windows-static
             skip_tests: true
           - name: macos-universal
             os: macos-latest
             platform: macos
             arch: x86_64;arm64
-            triplet: arch-env
             skip_tests: false
     env:
       ARCH: ${{ matrix.arch }}
-      VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
 
     steps:
       - name: Checkout (default ref)
@@ -121,56 +107,41 @@ jobs:
         with:
           ref: ${{ inputs.checkout_ref }}
 
-      - name: Resolve vcpkg toolchain Unix
+      - name: Setup Homebrew Unix
         if: runner.os != 'Windows'
-        id: vcpkg-unix
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install Unix Homebrew packages
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          candidates=()
-          if [ -n "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            candidates+=("${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake")
-          fi
-          candidates+=("$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake")
 
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate" ]; then
-              echo "toolchain=$candidate" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
+          brew update
+          brew install cmake
+          echo "$(brew --prefix cmake)/bin" >> "$GITHUB_PATH"
+          cmake --version
 
-          echo "Unable to locate vcpkg toolchain file on runner." >&2
-          exit 1
-
-      - name: Resolve vcpkg toolchain Windows
+      - name: Install latest CMake Windows
         if: runner.os == 'Windows'
-        id: vcpkg-windows
         shell: pwsh
         run: |
-          $candidates = @()
-          if ($env:VCPKG_INSTALLATION_ROOT) {
-            $candidates += (Join-Path $env:VCPKG_INSTALLATION_ROOT 'scripts/buildsystems/vcpkg.cmake')
-          }
-          $candidates += 'C:\vcpkg\scripts\buildsystems\vcpkg.cmake'
+          winget install --id Kitware.CMake --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
 
-          foreach ($candidate in $candidates) {
-            if (Test-Path $candidate) {
-              "toolchain=$candidate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-              exit 0
-            }
+          $cmakeBin = 'C:\Program Files\CMake\bin'
+          if (Test-Path $cmakeBin) {
+            $cmakeBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           }
 
-          throw 'Unable to locate vcpkg toolchain file on runner.'
+          cmake --version
 
-      - name: Cache vcpkg and CMake deps
+      - name: Cache CMake deps
         uses: actions/cache@v4
         with:
           path: |
-            build/vcpkg_installed
             build/_deps
           key: >-
-            ${{ inputs.cache_key_prefix }}${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake', 'cmake/vcpkg-triplets/*.cmake', 'vcpkg.json') }}
+            ${{ inputs.cache_key_prefix }}${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt', 'cmake/**/*.cmake') }}
 
       - name: Setup Linux cross dependencies
         if: matrix.platform == 'linux'
@@ -228,10 +199,6 @@ jobs:
               libxml2-dev zlib1g-dev
             )
 
-            if [ "${{ inputs.include_clang_tidy_linux }}" = 'true' ]; then
-              native+=(clang-tidy)
-            fi
-
             sudo dpkg --add-architecture "$target_arch"
             configure_apt_sources "$target_arch"
             sudo rm -rf /var/lib/apt/lists/*
@@ -278,32 +245,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          brew update
-          brew install llvm
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          "$(brew --prefix llvm)/bin/clang-tidy" --version
-
           echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
 
           if [ -d /Library/Frameworks/Mono.framework ]; then
             sudo rm -rf /Library/Frameworks/Mono.framework
           fi
 
-      - name: Verify clang-tidy Linux
-        if: matrix.platform == 'linux' && inputs.include_clang_tidy_linux
-        shell: bash
-        run: clang-tidy --version
-
       - name: Setup MSVC developer command prompt
         if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.msvc_arch }}
-
-      - name: Verify clang-tidy Windows
-        if: matrix.platform == 'windows' && inputs.include_clang_tidy_linux
-        shell: pwsh
-        run: clang-tidy --version
 
       - name: Setup ARM64EC flags
         if: matrix.platform == 'windows' && matrix.arch == 'arm64ec'
@@ -314,16 +266,12 @@ jobs:
 
       - name: Configure Unix
         if: runner.os != 'Windows'
-        env:
-          VCPKG_TOOLCHAIN: ${{ steps.vcpkg-unix.outputs.toolchain }}
         shell: bash
         run: |
           set -euo pipefail
           cmake_args=(
             -B build
             -DCMAKE_BUILD_TYPE=${{ inputs.build_type }}
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN"
-            -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
             -DCMAKE_OSX_ARCHITECTURES="$ARCH"
           )
 
@@ -332,20 +280,15 @@ jobs:
           fi
 
           if [ -n "${TOOLCHAIN:-}" ]; then
-            cmake_args+=("-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${TOOLCHAIN}")
+            cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}")
           fi
 
           cmake "${cmake_args[@]}"
 
       - name: Configure Windows
         if: runner.os == 'Windows'
-        env:
-          VCPKG_TOOLCHAIN: ${{ steps.vcpkg-windows.outputs.toolchain }}
         shell: pwsh
-        run: |
-          cmake --preset ${{ inputs.windows_preset }} `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN" `
-            -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
+        run: cmake --preset ${{ inputs.windows_preset }}
 
       - name: Build Unix
         if: runner.os != 'Windows'
