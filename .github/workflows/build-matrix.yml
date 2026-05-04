@@ -146,12 +146,24 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+
           winget install --id Kitware.CMake --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
           winget install --id NSIS.NSIS --exact --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --force
 
-          'C:\Program Files\CMake\bin' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          'C:\Program Files\NSIS' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          'C:\Program Files (x86)\NSIS' | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $candidatePaths = @(
+            'C:\Program Files\CMake\bin',
+            'C:\Program Files\NSIS\Bin',
+            'C:\Program Files (x86)\NSIS\Bin',
+            "$env:LOCALAPPDATA\Programs\NSIS\Bin"
+          )
+
+          foreach ($pathEntry in $candidatePaths) {
+            $pathEntry | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            if (-not (($env:Path -split ';') -contains $pathEntry)) {
+              $env:Path = "$pathEntry;$env:Path"
+            }
+          }
 
           cmake --version
           makensis /VERSION
