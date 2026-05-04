@@ -72,4 +72,5 @@ else()
     )
 endif()
 
-include(cmake/cpack.cmake)
+include(cmake/code-signing.cmake)
+include(cmake/packaging.cmake)

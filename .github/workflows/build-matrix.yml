@@ -38,6 +38,23 @@ on:
         required: false
         default: ''
         type: string
+      package_with_cpack:
+        description: Build platform packages with CPack
+        required: false
+        default: false
+        type: boolean
+      notarize_macos:
+        description: Notarize macOS package when package_with_cpack is enabled and credentials are available
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      MACOS_NOTARIZATION_USERNAME:
+        required: false
+      MACOS_NOTARIZATION_TEAM_ID:
+        required: false
+      MACOS_NOTARIZATION_PASSWORD:
+        required: false
 
 permissions:
   contents: read
@@ -95,6 +112,9 @@ jobs:
             skip_tests: false
     env:
       ARCH: ${{ matrix.arch }}
+      MACOS_NOTARIZATION_USERNAME: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
+      MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+      MACOS_NOTARIZATION_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
 
     steps:
       - name: Checkout (default ref)
@@ -295,10 +315,48 @@ jobs:
         shell: bash
         run: cmake --build build
 
+      - name: Setup macOS notarytool keychain profile
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials "notarytool-profile" \
+            --apple-id "$MACOS_NOTARIZATION_USERNAME" \
+            --team-id "$MACOS_NOTARIZATION_TEAM_ID" \
+            --password "$MACOS_NOTARIZATION_PASSWORD"
+
+      - name: Configure macOS notarization profile
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build -DNOTARIZE_KEYCHAIN_PROFILE=notarytool-profile
+
+      - name: Build Unix package
+        if: runner.os != 'Windows' && inputs.package_with_cpack
+        shell: bash
+        run: cpack --config build/CPackConfig.cmake
+
+      - name: Notarize macOS package
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME != ''
+        shell: bash
+        run: cmake --build build --target notarize
+
+      - name: macOS notarization skipped notice
+        if: matrix.platform == 'macos' && inputs.package_with_cpack && inputs.notarize_macos && env.MACOS_NOTARIZATION_USERNAME == ''
+        shell: bash
+        run: |
+          echo "Notarization requested, but MACOS_NOTARIZATION_USERNAME is empty. Package was built without notarization."
+
       - name: Build Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: cmake --build --preset ${{ inputs.windows_preset }}
+
+      - name: Build Windows package
+        if: runner.os == 'Windows' && inputs.package_with_cpack
+        shell: pwsh
+        run: cpack --config ${{ inputs.windows_artifact_dir }}/CPackConfig.cmake
 
       - name: Test Unix
         if: runner.os != 'Windows' && inputs.run_tests && !matrix.skip_tests
@@ -323,6 +381,30 @@ jobs:
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: build/reaper_*.dylib
+
+      - name: Upload Linux package artifact
+        if: always() && matrix.platform == 'linux' && inputs.package_with_cpack
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-linux-package-{1}', inputs.artifact_prefix, matrix.arch) || format('linux-package-{0}', matrix.arch) }}
+          path: build/packages/*.deb
+          if-no-files-found: error
+
+      - name: Upload macOS package artifact
+        if: always() && matrix.platform == 'macos' && inputs.package_with_cpack
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-macos-package', inputs.artifact_prefix) || 'macos-package' }}
+          path: build/packages/*.pkg
+          if-no-files-found: error
+
+      - name: Upload Windows package artifact
+        if: always() && matrix.platform == 'windows' && inputs.package_with_cpack
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_prefix != '' && format('{0}-windows-package-{1}', inputs.artifact_prefix, matrix.arch) || format('windows-package-{0}', matrix.arch) }}
+          path: ${{ inputs.windows_artifact_dir }}/packages/*.exe
+          if-no-files-found: error
 
       - name: Upload Windows artifacts
         if: always() && matrix.platform == 'windows'

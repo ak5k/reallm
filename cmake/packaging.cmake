@@ -1,5 +1,20 @@
 # ── Project-specific data ────────────────────────────────────────────────────
 # Adapt these variables when reusing this file in another project.
+#
+# Release workflow:
+#   1. cmake --build <dir>
+#   2. cpack --config <dir>/CPackConfig.cmake   # produces signed .pkg / .exe / .deb
+#   3. cmake --build <dir> --target notarize    # macOS only: notarize + staple
+# Use the packages under CPACK_PACKAGE_DIRECTORY as release artifacts.
+#
+# macOS notarization credentials:
+#   Store once locally:
+#     xcrun notarytool store-credentials "notarytool-profile" \
+#         --apple-id <email> --team-id <team-id> --password <app-specific-password>
+#   Then configure: cmake -DNOTARIZE_KEYCHAIN_PROFILE=notarytool-profile ...
+#   In CI, set repository secrets MACOS_NOTARIZATION_USERNAME,
+#   MACOS_NOTARIZATION_TEAM_ID, MACOS_NOTARIZATION_PASSWORD and run
+#   store-credentials as a setup step before building.
 
 set(_pkg_vendor "ak5k")
 set(_pkg_homepage "https://github.com/ak5k/reallm")
@@ -79,6 +94,13 @@ set(CPACK_PACKAGE_DIRECTORY
     "Common output directory for CPack-generated packages"
 )
 
+# Remove stale package artifacts from previous runs.
+file(MAKE_DIRECTORY "${CPACK_PACKAGE_DIRECTORY}")
+file(GLOB _pkg_dir_entries "${CPACK_PACKAGE_DIRECTORY}/*")
+foreach(_entry IN LISTS _pkg_dir_entries)
+    file(REMOVE_RECURSE "${_entry}")
+endforeach()
+
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_STRIP_FILES OFF)
 
@@ -146,11 +168,11 @@ if(UNIX AND NOT APPLE)
     # Defaults to CMAKE_INSTALL_PREFIX if not set.
 endif()
 
-# CPack.cmake overwrites CPACK_PACKAGE_FILE_NAME with the source package name
-# at the end of its script (line ~1036). Save the binary name before inclusion.
+# CPack overwrites CPACK_PACKAGE_FILE_NAME with the source package name at the
+# end of its script. Save the binary name before inclusion.
 set(_binary_pkg_file_name "${CPACK_PACKAGE_FILE_NAME}")
 
-include(${CMAKE_ROOT}/Modules/CPack.cmake)
+include(CPack)
 
 # ── Notarize (macOS) ──────────────────────────────────────────────────────────
 if(

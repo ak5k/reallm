@@ -167,6 +167,9 @@ jobs:
       run_tests: true
       artifact_prefix: release
       cache_key_prefix: release-
+      package_with_cpack: true
+      notarize_macos: true
+    secrets: inherit
 
   upload-artifacts:
     name: Upload artifacts to release
@@ -193,6 +196,9 @@ jobs:
             release-artifacts/reaper_*.pdb
             release-artifacts/reaper_*.so
             release-artifacts/reaper_*.dylib
+            release-artifacts/*.exe
+            release-artifacts/*.deb
+            release-artifacts/*.pkg
           fail_on_unmatched_files: false
           overwrite_files: true
 
@@ -208,5 +214,8 @@ jobs:
             release-artifacts/reaper_*.pdb
             release-artifacts/reaper_*.so
             release-artifacts/reaper_*.dylib
+            release-artifacts/*.exe
+            release-artifacts/*.deb
+            release-artifacts/*.pkg
           fail_on_unmatched_files: false
           overwrite_files: true
