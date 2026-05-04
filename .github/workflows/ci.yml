@@ -17,9 +17,6 @@ jobs:
       windows_artifact_dir: build/windows-msvc-ninja-debug
       run_tests: true
       include_clang_tidy_linux: true
-      macos_mode: modern
-      matrix: >-
-        {"include":[{"name":"linux-x86_64","os":"ubuntu-latest","platform":"linux","arch":"x86_64","triplet":"arch-env","skip_tests":false},{"name":"linux-i686","os":"ubuntu-latest","platform":"linux","arch":"i686","triplet":"arch-env","skip_tests":true},{"name":"linux-armv7l","os":"ubuntu-latest","platform":"linux","arch":"armv7l","triplet":"arch-env","skip_tests":true},{"name":"linux-aarch64","os":"ubuntu-latest","platform":"linux","arch":"aarch64","triplet":"arch-env","skip_tests":true},{"name":"windows-x64","os":"windows-latest","platform":"windows","arch":"x64","msvc_arch":"x64","triplet":"x64-windows-static","skip_tests":false},{"name":"windows-x86","os":"windows-latest","platform":"windows","arch":"x86","msvc_arch":"x86","triplet":"x86-windows-static","skip_tests":true},{"name":"windows-arm64ec","os":"windows-latest","platform":"windows","arch":"arm64ec","msvc_arch":"amd64_arm64","triplet":"arm64ec-windows-static","skip_tests":true},{"name":"macos-universal","os":"macos-latest","platform":"macos","arch":"x86_64;arm64","triplet":"arch-env","skip_tests":false}]}
 
   clang-format-report:
     name: clang-format report

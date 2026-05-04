@@ -3,10 +3,6 @@ name: Build Matrix Reusable
 on:
   workflow_call:
     inputs:
-      matrix:
-        description: JSON object for strategy.matrix
-        required: true
-        type: string
       checkout_ref:
         description: Optional git ref to checkout
         required: false
@@ -37,11 +33,6 @@ on:
         required: false
         default: true
         type: boolean
-      macos_mode:
-        description: macOS env setup mode (modern or legacy)
-        required: false
-        default: modern
-        type: string
       artifact_prefix:
         description: Optional artifact name prefix
         required: false
@@ -60,10 +51,61 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(inputs.matrix) }}
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            triplet: arch-env
+            skip_tests: false
+          - name: linux-i686
+            os: ubuntu-latest
+            platform: linux
+            arch: i686
+            triplet: arch-env
+            skip_tests: true
+          - name: linux-armv7l
+            os: ubuntu-latest
+            platform: linux
+            arch: armv7l
+            triplet: arch-env
+            skip_tests: true
+          - name: linux-aarch64
+            os: ubuntu-latest
+            platform: linux
+            arch: aarch64
+            triplet: arch-env
+            skip_tests: true
+          - name: windows-x64
+            os: windows-latest
+            platform: windows
+            arch: x64
+            msvc_arch: x64
+            triplet: x64-windows-static
+            skip_tests: false
+          - name: windows-x86
+            os: windows-latest
+            platform: windows
+            arch: x86
+            msvc_arch: x86
+            triplet: x86-windows-static
+            skip_tests: true
+          - name: windows-arm64ec
+            os: windows-latest
+            platform: windows
+            arch: arm64ec
+            msvc_arch: amd64_arm64
+            triplet: arm64ec-windows-static
+            skip_tests: true
+          - name: macos-universal
+            os: macos-latest
+            platform: macos
+            arch: x86_64;arm64
+            triplet: arch-env
+            skip_tests: false
     env:
       ARCH: ${{ matrix.arch }}
       VCPKG_OVERLAY_TRIPLETS: cmake/vcpkg-triplets
@@ -230,8 +272,8 @@ jobs:
               ;;
           esac
 
-      - name: Setup macOS build environment (modern)
-        if: matrix.platform == 'macos' && inputs.macos_mode == 'modern'
+      - name: Setup macOS build environment
+        if: matrix.platform == 'macos'
         shell: bash
         run: |
           set -euo pipefail
@@ -242,28 +284,6 @@ jobs:
           "$(brew --prefix llvm)/bin/clang-tidy" --version
 
           echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
-
-          if [ -d /Library/Frameworks/Mono.framework ]; then
-            sudo rm -rf /Library/Frameworks/Mono.framework
-          fi
-
-      - name: Setup macOS build environment (legacy)
-        if: matrix.platform == 'macos' && inputs.macos_mode == 'legacy'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "$ARCH" = 'arm64' ]; then
-            echo "DEPLOY_TARGET=11.0" >> "$GITHUB_ENV"
-          else
-            echo "DEPLOY_TARGET=10.9" >> "$GITHUB_ENV"
-            echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk" >> "$GITHUB_ENV"
-            if [ ! -d /Library/Developer/CommandLineTools/SDKs/MacOSX10.10.sdk ]; then
-              curl -fsSLO https://github.com/phracker/MacOSX-SDKs/releases/download/10.15/MacOSX10.10.sdk.tar.xz
-              echo "608a89db8b4be150a945871230b5ba5d4767a8500bc5fe76ddf10f5cec5ef513 MacOSX10.10.sdk.tar.xz" | shasum -a 256 -c
-              sudo tar xf MacOSX10.10.sdk.tar.xz -C /Library/Developer/CommandLineTools/SDKs
-            fi
-          fi
 
           if [ -d /Library/Frameworks/Mono.framework ]; then
             sudo rm -rf /Library/Frameworks/Mono.framework
