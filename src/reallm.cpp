@@ -749,6 +749,7 @@ void dfs(Network<MediaTrack*>& network, MediaTrack* currentTrack, MediaTrack* ta
     }
 
     path.pop_back();
+    visited.pop_back();
 }
 
 std::vector<std::vector<MediaTrack*>> findAllPaths(Network<MediaTrack*>& network,
