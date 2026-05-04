@@ -1,3 +1,10 @@
+# [0.8.0-rc.2](https://github.com/ak5k/reallm/compare/v0.8.0-rc.1...v0.8.0-rc.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **reallm:** test ([ecb5694](https://github.com/ak5k/reallm/commit/ecb569457fb007b42e061bf9ec19dbc05981513c))
+
 # [0.8.0-rc.1](https://github.com/ak5k/reallm/compare/v0.7.0...v0.8.0-rc.1) (2026-05-04)
 
 
