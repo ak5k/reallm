@@ -30,12 +30,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           npx
-          --package semantic-release@24
-          --package @semantic-release/commit-analyzer@13
-          --package @semantic-release/release-notes-generator@14
-          --package @semantic-release/changelog@6
-          --package @semantic-release/git@10
-          --package @semantic-release/github@11
+          --package semantic-release
+          --package @semantic-release/commit-analyzer
+          --package @semantic-release/release-notes-generator
+          --package @semantic-release/changelog
+          --package @semantic-release/git
+          --package @semantic-release/github
           semantic-release
 
       - name: Capture release tag
