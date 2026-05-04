@@ -210,10 +210,10 @@ jobs:
           draft: true
           generate_release_notes: false
           files: |
-            release-artifacts/reaper_*.dll
-            release-artifacts/reaper_*.pdb
-            release-artifacts/reaper_*.so
-            release-artifacts/reaper_*.dylib
+            release-artifacts/*.dll
+            release-artifacts/*.pdb
+            release-artifacts/*.so
+            release-artifacts/*.dylib
             release-artifacts/*.exe
             release-artifacts/*.deb
             release-artifacts/*.pkg

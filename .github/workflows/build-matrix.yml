@@ -373,38 +373,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
-          path: build/reaper_*.so
+          path: |
+            build/*.so
+            build/packages/*.deb
+          if-no-files-found: warn
 
       - name: Upload macOS artifacts
         if: always() && matrix.platform == 'macos'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
-          path: build/reaper_*.dylib
-
-      - name: Upload Linux package artifact
-        if: always() && matrix.platform == 'linux' && inputs.package_with_cpack
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.artifact_prefix != '' && format('{0}-linux-package-{1}', inputs.artifact_prefix, matrix.arch) || format('linux-package-{0}', matrix.arch) }}
-          path: build/packages/*.deb
-          if-no-files-found: error
-
-      - name: Upload macOS package artifact
-        if: always() && matrix.platform == 'macos' && inputs.package_with_cpack
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.artifact_prefix != '' && format('{0}-macos-package', inputs.artifact_prefix) || 'macos-package' }}
-          path: build/packages/*.pkg
-          if-no-files-found: error
-
-      - name: Upload Windows package artifact
-        if: always() && matrix.platform == 'windows' && inputs.package_with_cpack
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.artifact_prefix != '' && format('{0}-windows-package-{1}', inputs.artifact_prefix, matrix.arch) || format('windows-package-{0}', matrix.arch) }}
-          path: ${{ inputs.windows_artifact_dir }}/packages/*.exe
-          if-no-files-found: error
+          path: |
+            build/*.dylib
+            build/packages/*.pkg
+          if-no-files-found: warn
 
       - name: Upload Windows artifacts
         if: always() && matrix.platform == 'windows'
@@ -412,5 +394,7 @@ jobs:
         with:
           name: ${{ inputs.artifact_prefix != '' && format('{0}-{1}', inputs.artifact_prefix, matrix.name) || matrix.name }}
           path: |
-            ${{ inputs.windows_artifact_dir }}/reaper_*.dll
-            ${{ inputs.windows_artifact_dir }}/reaper_*.pdb
+            ${{ inputs.windows_artifact_dir }}/*.dll
+            ${{ inputs.windows_artifact_dir }}/*.pdb
+            ${{ inputs.windows_artifact_dir }}/packages/*.exe
+          if-no-files-found: warn
