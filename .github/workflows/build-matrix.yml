@@ -122,10 +122,15 @@ jobs:
             arch: arm64ec
             msvc_arch: amd64_arm64
             skip_tests: true
-          - name: macos-universal
+          - name: macos-x86_64
             os: macos-latest
             platform: macos
-            arch: x86_64;arm64
+            arch: x86_64
+            skip_tests: true
+          - name: macos-arm64
+            os: macos-latest
+            platform: macos
+            arch: arm64
             skip_tests: false
     env:
       ARCH: ${{ matrix.arch }}

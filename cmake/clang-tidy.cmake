@@ -49,11 +49,6 @@ function(enable_clang_tidy_for_targets)
         return()
     endif()
 
-    if(APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES ";")
-        message(STATUS "Skipping clang-tidy for universal macOS builds")
-        return()
-    endif()
-
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         message(STATUS "Skipping clang-tidy when using MSVC compiler")
         return()
