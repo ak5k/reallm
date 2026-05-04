@@ -2,8 +2,8 @@
     "branches": [
         "main",
         {
-            "name": "rc",
-            "prerelease": "rc"
+            "name": "!(main)",
+            "prerelease": true
         }
     ],
     "tagFormat": "v${version}",
