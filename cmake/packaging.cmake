@@ -84,8 +84,16 @@ else()
     set(CPACK_SYSTEM_NAME "linux-${_pkg_arch}")
 endif()
 
+set(_pkg_file_version "${PROJECT_VERSION_MAJOR}")
+if(DEFINED PROJECT_VERSION_MINOR AND NOT PROJECT_VERSION_MINOR STREQUAL "")
+    string(APPEND _pkg_file_version ".${PROJECT_VERSION_MINOR}")
+endif()
+if(DEFINED PROJECT_VERSION_PATCH AND NOT PROJECT_VERSION_PATCH STREQUAL "")
+    string(APPEND _pkg_file_version ".${PROJECT_VERSION_PATCH}")
+endif()
+
 set(CPACK_PACKAGE_FILE_NAME
-    "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}"
+    "${CPACK_PACKAGE_NAME}-${_pkg_file_version}-${CPACK_SYSTEM_NAME}"
 )
 
 set(CPACK_PACKAGE_DIRECTORY
@@ -103,10 +111,7 @@ endforeach()
 
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_STRIP_FILES OFF)
-
-# Ensure generators that rely on component metadata (notably macOS
-# productbuild) include the default install component.
-set(CPACK_COMPONENTS_ALL "Unspecified")
+set(CPACK_MONOLITHIC_INSTALL ON)
 
 # Generator selection.
 if(WIN32)
