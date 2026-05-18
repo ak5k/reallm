@@ -407,7 +407,7 @@ jobs:
 
       - name: Sign Windows binaries
         if: matrix.platform == 'windows' && inputs.package_with_cpack && inputs.sign_windows_artifacts && env.AZURE_TENANT_ID != ''
-        uses: azure/artifact-signing-action@v1
+        uses: azure/artifact-signing-action@v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -429,7 +429,7 @@ jobs:
 
       - name: Sign Windows installer
         if: matrix.platform == 'windows' && inputs.package_with_cpack && inputs.sign_windows_artifacts && env.AZURE_TENANT_ID != ''
-        uses: azure/artifact-signing-action@v1
+        uses: azure/artifact-signing-action@v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
