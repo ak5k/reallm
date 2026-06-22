@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main
@@ -72,7 +72,7 @@ jobs:
       ARCH: x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main
@@ -146,7 +146,7 @@ jobs:
       ARCH: x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Homebrew
         uses: Homebrew/actions/setup-homebrew@main

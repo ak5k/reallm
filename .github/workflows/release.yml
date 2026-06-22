@@ -23,7 +23,7 @@ jobs:
       is_update: ${{ steps.tag.outputs.is_update }}
       preid: ${{ steps.existing.outputs.preid }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
