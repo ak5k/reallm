@@ -208,7 +208,7 @@ jobs:
           }
 
       - name: Cache CMake deps
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             build/_deps
